@@ -1,0 +1,478 @@
+// Saripda Suite — Prisma schema
+// Source of truth for the data model is Section 6 of insurance-crm-plan.md (Baseline v1.4).
+// SQLite has no native enum type, so "enum-like" fields are plain String columns —
+// the allowed values are documented in comments and enforced at the application layer.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Host-level infrastructure (no agencyId — shared across every agency on
+// this one installation; see Section 6's note on tenant scoping)
+// ─────────────────────────────────────────────────────────────────────────
+
+model SystemConfig {
+  id               String    @id @default(cuid())
+  hostIp           String?
+  hostPort         Int?
+  setupCompletedAt DateTime?
+  updatedAt        DateTime  @updatedAt
+}
+
+model StorageLocation {
+  id            String    @id @default(cuid())
+  path          String
+  label         String
+  isActive      Boolean   @default(false)
+  isReachable   Boolean   @default(true)
+  lastCheckedAt DateTime?
+  addedAt       DateTime  @default(now())
+
+  documents Document[]
+}
+
+model RestartEvent {
+  id          String   @id @default(cuid())
+  restartedAt DateTime @default(now())
+  /// health_check_failed | manual | crash
+  reason      String
+}
+
+// agencyId is nullable here specifically: null = host-level alert (disk-full,
+// restart loop), set = agency-scoped alert (e.g. unreachable mailbox)
+model SystemAlert {
+  id         String    @id @default(cuid())
+  agencyId   String?
+  agency     Agency?   @relation(fields: [agencyId], references: [id])
+  /// storage_full | storage_unreachable | email_intake_failure | restart_loop | other
+  type       String
+  message    String
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([agencyId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tenant root
+// ─────────────────────────────────────────────────────────────────────────
+
+model Agency {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users          User[]
+  insuranceLines InsuranceLine[]
+  products       Product[]
+  emailIntake    EmailIntakeConfig?
+  leads          Lead[]
+  policies       Policy[]
+  documents      Document[]
+  recordLocks    RecordLock[]
+  activityLogs   ActivityLog[]
+  systemAlerts   SystemAlert[]
+}
+
+// agencyId nullable: Super Admin sits outside every agency (Section 2)
+model User {
+  id           String   @id @default(cuid())
+  agencyId     String?
+  agency       Agency?  @relation(fields: [agencyId], references: [id])
+  name         String
+  email        String   @unique
+  passwordHash String
+  /// super_admin | agent | manager | head
+  role         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  // Login security baseline (Section 5) — reset failedLoginAttempts to 0 on
+  // any successful login
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  // Sub-team scoping (Section 3): only meaningful when role = agent.
+  // Null means "unassigned", visible only to the Agency Head.
+  managerId     String?
+  manager       User?   @relation("ManagerAgents", fields: [managerId], references: [id])
+  managedAgents User[]  @relation("ManagerAgents")
+
+  leadsOwned         Lead[]        @relation("LeadOwner")
+  policiesOwned      Policy[]      @relation("PolicyOwner")
+  documentsUploaded  Document[]    @relation("DocumentUploader")
+  recordLocksHeld    RecordLock[]  @relation("RecordLockHolder")
+  activityLogEntries ActivityLog[] @relation("ActivityLogUser")
+
+  @@index([agencyId])
+  @@index([managerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Insurance lines & products (Section 4)
+// ─────────────────────────────────────────────────────────────────────────
+
+model InsuranceLine {
+  id        String   @id @default(cuid())
+  agencyId  String
+  agency    Agency   @relation(fields: [agencyId], references: [id])
+  /// agency's own free-text label, e.g. "Life", "Family Protection Plan"
+  name      String
+  /// life | auto | property | health | travel | other — the fixed set the
+  /// app's logic keys off of (forms, required-info checklist, renewal rule)
+  category  String
+  createdAt DateTime @default(now())
+
+  products Product[]
+  leads    Lead[]
+  policies Policy[]
+
+  @@index([agencyId])
+}
+
+model Product {
+  id             String        @id @default(cuid())
+  agencyId       String
+  agency         Agency        @relation(fields: [agencyId], references: [id])
+  lineId         String
+  line           InsuranceLine @relation(fields: [lineId], references: [id])
+  name           String
+  description    String?
+  /// term | non_term_traditional | vul — only meaningful when
+  /// line.category = "life"; drives the renewal/lapsing rule (Section 5)
+  lifePolicyType String?
+  createdAt      DateTime      @default(now())
+
+  leads    Lead[]
+  policies Policy[]
+
+  @@index([agencyId])
+  @@index([lineId])
+}
+
+// One per agency; an agency may skip this if it doesn't want website intake
+model EmailIntakeConfig {
+  id                String    @id @default(cuid())
+  agencyId          String    @unique
+  agency            Agency    @relation(fields: [agencyId], references: [id])
+  imapHost          String
+  imapPort          Int
+  username          String
+  /// encrypted at rest with the app-level key (Section 7); never re-shown
+  encryptedPassword String
+  folder            String
+  useSsl            Boolean   @default(true)
+  isEnabled         Boolean   @default(true)
+  lastPolledAt      DateTime?
+  lastErrorAt       DateTime?
+  lastErrorMessage  String?
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Leads & Policies (Section 5)
+// ─────────────────────────────────────────────────────────────────────────
+
+model Lead {
+  id               String         @id @default(cuid())
+  agencyId         String
+  agency           Agency         @relation(fields: [agencyId], references: [id])
+  ownerId          String?
+  owner            User?          @relation("LeadOwner", fields: [ownerId], references: [id])
+  name             String
+  phone            String?
+  email            String?
+  /// e.g. "Website Inquiry", "Referral", "Manual"
+  source           String
+  /// true if an inquiry email didn't match the expected structured format
+  needsReview      Boolean        @default(false)
+  lineId           String?
+  line             InsuranceLine? @relation(fields: [lineId], references: [id])
+  productId        String?
+  product          Product?       @relation(fields: [productId], references: [id])
+  /// new | contacted | quoted | negotiating | won | lost
+  status           String         @default("new")
+  notes            String?
+  nextFollowUpDate DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  policies     Policy[]
+  activityLogs ActivityLog[]
+
+  @@index([agencyId, status])
+  @@index([ownerId])
+}
+
+model Policy {
+  id       String @id @default(cuid())
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  // Nullable: a policy doesn't have to originate from a tracked Lead
+  // (e.g. a walk-in renewal or a migrated legacy policy)
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  ownerId String
+  owner   User   @relation("PolicyOwner", fields: [ownerId], references: [id])
+
+  lineId    String
+  line      InsuranceLine @relation(fields: [lineId], references: [id])
+  productId String
+  product   Product       @relation(fields: [productId], references: [id])
+
+  premium     Float
+  commission  Float?
+  startDate   DateTime
+  // For Travel-category policies specifically, startDate/renewalDate hold
+  // the trip's start/end dates rather than an annual renewal cycle
+  // (Section 5) — reusing the same two fields avoids a category-specific
+  // schema branch.
+  renewalDate DateTime
+
+  // draft | active | grace_period | lapsed | cancelled | completed
+  // Created as "draft" (Section 5) so long forms like Life's can be saved
+  // incrementally; moves to "active" only via the explicit Activate action.
+  // "completed" is Travel-only — set by the daily job once a Travel policy's
+  // trip end date (renewalDate) passes; no other category reaches it.
+  status                  String    @default("draft")
+  gracePeriodEndsAt       DateTime?
+  vulFundBalance          Float?
+  vulFundBalanceUpdatedAt DateTime?
+
+  // Convenience pointer to which of this policy's Document rows is
+  // specifically the proof of payment (nullable until uploaded)
+  proofOfPaymentDocId String?   @unique
+  proofOfPaymentDoc   Document? @relation("PolicyProofOfPayment", fields: [proofOfPaymentDocId], references: [id])
+
+  // Line-specific extras not worth a dedicated table
+  metadata String?
+
+  documents    Document[]    @relation("PolicyDocuments")
+  recordLocks  RecordLock[]
+  activityLogs ActivityLog[]
+
+  lifeInsured   LifeInsured?
+  lifeOwner     LifeOwner?
+  beneficiaries Beneficiary[]
+  autoOwner     AutoOwner?
+  vehicle       Vehicle?
+  travelDetail  TravelDetail?
+
+  @@index([agencyId, status])
+  @@index([ownerId])
+  @@index([leadId])
+}
+
+model Document {
+  id       String @id @default(cuid())
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  policyId String
+  policy   Policy @relation("PolicyDocuments", fields: [policyId], references: [id])
+
+  storageLocationId String
+  storageLocation   StorageLocation @relation(fields: [storageLocationId], references: [id])
+
+  /// proof_of_payment | valid_id | other
+  type          String
+  /// relative to the storage location's own path, e.g. "{agencyId}/{policyId}/{id}.ext"
+  filePath      String
+  fileSizeBytes Int
+  uploadedBy    String
+  uploader      User     @relation("DocumentUploader", fields: [uploadedBy], references: [id])
+  uploadedAt    DateTime @default(now())
+
+  // Back-relation for Policy.proofOfPaymentDoc (Section 6) — a Document
+  // doesn't carry a flag itself; Policy points at whichever one applies
+  policyAsProofOfPayment Policy? @relation("PolicyProofOfPayment")
+
+  @@index([agencyId])
+  @@index([policyId])
+}
+
+// One row per currently-checked-out record; deleted on check-in or timeout
+// expiry (Section 5's Record Locking)
+model RecordLock {
+  id             String   @id @default(cuid())
+  agencyId       String
+  agency         Agency   @relation(fields: [agencyId], references: [id])
+  /// lead | policy
+  recordType     String
+  recordId       String
+  lockedBy       String
+  holder         User     @relation("RecordLockHolder", fields: [lockedBy], references: [id])
+  lockedAt       DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+
+  // Belt-and-braces link so a lock on a Policy record can be joined
+  // directly; recordId still holds the canonical id for lead locks too
+  policyId String?
+  policy   Policy? @relation(fields: [policyId], references: [id])
+
+  // Prevents two near-simultaneous check-outs of the same record from both
+  // succeeding (Section 6)
+  @@unique([recordType, recordId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Life insurance specific (only attached when Policy.line.category = "life")
+// ─────────────────────────────────────────────────────────────────────────
+
+// Reusable shape for both Insured and Owner — most fields overlap
+model Person {
+  id                    String   @id @default(cuid())
+  firstName             String
+  middleName            String?
+  lastName              String
+  height                Float?
+  weightLbs             Float?
+  presentAddress        String?
+  permanentAddress      String?
+  mobileNo              String?
+  telephoneNo           String?
+  religion              String?
+  civilStatus           String?
+  birthdate             DateTime
+  birthplace            String?
+  genderAtBirth         String?
+  weightAtBirth         Float?
+  /// alive | deceased
+  fatherStatus          String?
+  fatherAgeOrAgeAtDeath Int?
+  /// alive | deceased
+  motherStatus          String?
+  motherAgeOrAgeAtDeath Int?
+  // Up to 3 nullable slots each — SQLite has no scalar-list support
+  brotherAge1           Int?
+  brotherAge2           Int?
+  brotherAge3           Int?
+  sisterAge1            Int?
+  sisterAge2            Int?
+  sisterAge3            Int?
+
+  // Not one-to-one: when isSameAsInsured is true, one Person row is pointed
+  // at by both a LifeInsured row and a LifeOwner row (Section 6)
+  lifeInsuredAs LifeInsured[]
+  lifeOwnerAs   LifeOwner[]
+}
+
+model LifeInsured {
+  id       String  @id @default(cuid())
+  personId String
+  person   Person  @relation(fields: [personId], references: [id])
+  policyId String  @unique
+  policy   Policy  @relation(fields: [policyId], references: [id])
+  isSmoker Boolean @default(false)
+}
+
+// When isSameAsInsured is true, personId points at the SAME Person row as
+// the policy's LifeInsured.personId (not a duplicate copy) — the form just
+// shows the employment/ID fields as additional, without re-asking shared ones
+model LifeOwner {
+  id                      String    @id @default(cuid())
+  personId                String
+  person                  Person    @relation(fields: [personId], references: [id])
+  policyId                String    @unique
+  policy                  Policy    @relation(fields: [policyId], references: [id])
+  isSameAsInsured         Boolean   @default(false)
+  employerBusinessName    String?
+  employerBusinessAddress String?
+  natureOfBusiness        String?
+  occupation              String?
+  totalYearsEmployment    Int?
+  tinNo                   String?
+  sssNo                   String?
+  validIdType             String?
+  validIdNo               String?
+  validIdExpirationDate   DateTime?
+}
+
+// Up to 3 primary, up to 2 contingent — enforced at the application layer,
+// not by a DB constraint
+model Beneficiary {
+  id                    String   @id @default(cuid())
+  policyId              String
+  policy                Policy   @relation(fields: [policyId], references: [id])
+  /// primary | contingent — named beneficiaryType (not "category") to avoid
+  /// colliding with InsuranceLine.category, which means something else
+  beneficiaryType       String
+  slotNumber            Int
+  firstName             String
+  middleName            String?
+  lastName              String
+  permanentAddress      String?
+  birthdate             DateTime
+  mobileNo              String?
+  relationshipToInsured String?
+
+  @@index([policyId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Auto insurance specific (only attached when Policy.line.category = "auto")
+// ─────────────────────────────────────────────────────────────────────────
+
+model AutoOwner {
+  id           String @id @default(cuid())
+  policyId     String @unique
+  policy       Policy @relation(fields: [policyId], references: [id])
+  completeName String
+}
+
+model Vehicle {
+  id           String @id @default(cuid())
+  policyId     String @unique
+  policy       Policy @relation(fields: [policyId], references: [id])
+  carMaker     String
+  carModel     String
+  yearReleased Int
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Travel insurance specific (only attached when Policy.line.category = "travel")
+// ─────────────────────────────────────────────────────────────────────────
+
+model TravelDetail {
+  id              String  @id @default(cuid())
+  policyId        String  @unique
+  // Policy.startDate / renewalDate double as the trip's start/end dates for
+  // Travel policies (Section 5) — no separate date fields needed here
+  policy          Policy  @relation(fields: [policyId], references: [id])
+  travelerName    String
+  passportNo      String
+  destination     String
+  purposeOfTravel String?
+  /// medical | baggage | trip_cancellation | comprehensive
+  coverageType    String
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Audit trail (Section 5's Audit / Activity Log — required, not optional)
+// ─────────────────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  agencyId  String
+  agency    Agency   @relation(fields: [agencyId], references: [id])
+  // Document actions log against their parent policyId, since Document has
+  // no column of its own here; login/user-management events set neither
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id])
+  policyId  String?
+  policy    Policy?  @relation(fields: [policyId], references: [id])
+  userId    String
+  user      User     @relation("ActivityLogUser", fields: [userId], references: [id])
+  action    String
+  timestamp DateTime @default(now())
+  note      String?
+
+  @@index([agencyId, timestamp])
+}
