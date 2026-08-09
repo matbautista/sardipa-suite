@@ -1,0 +1,11 @@
+-- Reliability foundations (Section 9 of the plan): WAL (Write-Ahead Logging)
+-- mode lets readers and a writer proceed concurrently instead of blocking
+-- each other, which is the main source of "database is locked" errors under
+-- the app's normal multi-agent-at-once usage.
+--
+-- Unlike busy_timeout (a per-connection setting, applied at runtime in
+-- src/lib/prisma.ts instead), journal_mode is a durable property of the
+-- database FILE itself — setting it once here makes every future
+-- connection (the app, `prisma studio`, the watchdog script, migrations)
+-- use WAL mode from then on, with no per-connection setup needed.
+PRAGMA journal_mode = WAL;

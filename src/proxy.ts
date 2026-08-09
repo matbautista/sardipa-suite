@@ -14,7 +14,8 @@ const { auth } = NextAuth(authConfig);
 export const proxy = auth;
 
 export const config = {
-  // Everything except NextAuth's own API routes and static assets goes
+  // Everything except NextAuth's own API routes, the health check (Section
+  // 9 — the process supervisor has no session), and static assets goes
   // through the `authorized` callback in auth.config.ts.
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/health|_next/static|_next/image|favicon.ico).*)"],
 };

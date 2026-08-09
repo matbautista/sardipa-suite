@@ -4,7 +4,14 @@ A lead-to-sale tracking CRM for insurance agencies — leads, policies, renewals
 
 ## Status
 
-**Phase 1 (scaffold) and phase 4 (auth & tenant scoping) are in place** (Section 10 of the plan). Phases 2–3 (reliability foundations, first-run setup wizard) and 5 onward (real Super Admin/Agency Head UI, Leads/Policies CRUD, etc.) aren't built yet — logging in currently only works against the seeded dev accounts below, not a real onboarding flow. The full spec lives in [`insurance-crm-plan.md`](./insurance-crm-plan.md) (currently Baseline v1.4) and remains the source of truth for everything not yet built.
+**Phases 1, 2, and 4 are in place** (Section 10 of the plan): scaffold, reliability foundations, and auth & tenant scoping. Phase 3 (first-run setup wizard) and 5 onward (real Super Admin/Agency Head UI, Leads/Policies CRUD, etc.) aren't built yet — logging in currently only works against the seeded dev accounts below, not a real onboarding flow. The full spec lives in [`insurance-crm-plan.md`](./insurance-crm-plan.md) (currently Baseline v1.4) and remains the source of truth for everything not yet built.
+
+What phase 2 actually added:
+- **WAL mode**, set once via a migration since (unlike `busy_timeout`) it's a durable property of the database file itself, not a per-connection setting
+- **`busy_timeout` set explicitly** (5000ms) on the SQLite driver adapter
+- **Retry-with-backoff on top of that** (`src/lib/prisma.ts`) — verified empirically that SQLite lock contention surfaces through this Prisma/adapter combination as error code `P1008` ("Operation has timed out"), not a raw `SQLITE_BUSY`; 3 attempts with short backoff between them, tested by actually holding a write lock across process boundaries long enough to force real contention, both the success and exhausted-retries cases
+- **`GET /api/health`** — public (excluded from the auth gate in `src/proxy.ts`), checks real DB connectivity
+- **`scripts/watchdog.mjs`** — the process supervisor: polls `/api/health`, restarts the app on a sustained failure window or an outright crash, and stops auto-restarting (writing a `SystemAlert`) after repeated restarts in a short window. Run via `npm run start:supervised`. Verified live, not just read through: crash detection, the health-check-failure path, restart-loop protection triggering at the configured threshold, and — this caught a real bug — a race condition where killing a child during a deliberate restart also fired the original "unexpected exit" handler, triggering a second overlapping restart and `EADDRINUSE` chaos. Fixed and re-verified. See the file's own header comment for a known Windows limitation around how it must be stopped to avoid orphaning the app process.
 
 What phase 4 actually added:
 - **Auth.js (NextAuth v5)** with a Credentials provider — email/password checked against `User.passwordHash` (bcrypt)
@@ -61,6 +68,7 @@ SQLite has no native enum type, so every "enum-like" column (`role`, `status`, `
 | Command | What it does |
 |---|---|
 | `npm run dev` | Start the Next.js dev server |
+| `npm run start:supervised` | Run under the process supervisor (`scripts/watchdog.mjs`) — requires `npm run build` first, same as plain `npm run start`. For testing production-like reliability behavior, not everyday dev |
 | `npm run db:migrate` | Create/apply a Prisma migration |
 | `npm run db:seed` | Re-run the seed script |
 | `npm run db:studio` | Open Prisma Studio (database GUI) |

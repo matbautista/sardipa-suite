@@ -31,7 +31,7 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
             Signed in as {user.name} &middot; role: {user.role}
-            {isSuperAdmin ? " · Super Admin (no agency)" : ""}
+            {isSuperAdmin ? " (sits outside every agency)" : ""}
           </p>
         </div>
         <form
