@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
-import { getScopedPrisma } from "@/lib/tenant-db";
 import { prisma } from "@/lib/prisma";
+import { listOwnLeads } from "@/lib/leads";
 import { signOut } from "@/auth";
 
 // Demonstrates the auth + tenant-scoping foundation from Section 10 phase 4:
 // session carries agencyId/role, and every query for an agency user goes
-// through the scoped data-access layer. Sub-team scoping (Manager sees only
-// their own agents, Section 3) and real Leads/Policies UI are later phases.
+// through the scoped data-access layer. Cross-agent visibility (Manager
+// sees their team, Head sees the whole agency, Section 3) is phase 12 —
+// this dashboard only ever shows the signed-in user's own leads, same as
+// the full /leads CRUD page from phase 7.
 export default async function DashboardPage() {
   const session = await requireSession();
   const { user } = session;
@@ -18,12 +20,7 @@ export default async function DashboardPage() {
     ? await prisma.agency.findMany({ orderBy: { name: "asc" } })
     : [];
 
-  const leads = !isSuperAdmin
-    ? await getScopedPrisma(user.agencyId!).lead.findMany({
-        orderBy: { createdAt: "desc" },
-        include: { owner: true },
-      })
-    : [];
+  const leads = !isSuperAdmin ? await listOwnLeads(user.agencyId!, user.id) : [];
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -78,18 +75,19 @@ export default async function DashboardPage() {
               </Link>
             </div>
           )}
-          <h2 className="text-sm font-medium text-gray-700">Leads in your agency</h2>
-          <p className="mt-1 text-xs text-gray-400">
-            Fetched through the tenant-scoped data-access layer — every row below is
-            guaranteed to belong to your agency, not just filtered client-side.
-          </p>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-700">Your leads</h2>
+            <Link href="/leads" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Manage leads
+            </Link>
+          </div>
           <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-            {leads.map((lead) => (
+            {leads.slice(0, 5).map((lead) => (
               <li key={lead.id} className="flex justify-between px-4 py-3 text-sm">
-                <span className="text-gray-800">{lead.name}</span>
-                <span className="text-gray-400">
-                  {lead.owner?.name ?? "unassigned"} &middot; {lead.status}
-                </span>
+                <Link href={`/leads/${lead.id}`} className="text-gray-800 hover:underline">
+                  {lead.name}
+                </Link>
+                <span className="text-gray-400">{lead.status}</span>
               </li>
             ))}
             {leads.length === 0 && (
