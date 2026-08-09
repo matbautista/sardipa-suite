@@ -4,7 +4,16 @@ A lead-to-sale tracking CRM for insurance agencies — leads, policies, renewals
 
 ## Status
 
-**Phases 1, 2, and 4 are in place** (Section 10 of the plan): scaffold, reliability foundations, and auth & tenant scoping. Phase 3 (first-run setup wizard) and 5 onward (real Super Admin/Agency Head UI, Leads/Policies CRUD, etc.) aren't built yet — logging in currently only works against the seeded dev accounts below, not a real onboarding flow. The full spec lives in [`insurance-crm-plan.md`](./insurance-crm-plan.md) (currently Baseline v1.4) and remains the source of truth for everything not yet built.
+**Phases 1–4 are in place** (Section 10 of the plan): scaffold, reliability foundations, first-run setup wizard, and auth & tenant scoping. Phase 5 onward (real Super Admin/Agency Head UI, Leads/Policies CRUD, etc.) aren't built yet. The full spec lives in [`insurance-crm-plan.md`](./insurance-crm-plan.md) (currently Baseline v1.4) and remains the source of truth for everything not yet built.
+
+What phase 3 actually added:
+- **`/setup`** — blocks every route (via `src/proxy.ts`) until it's done: create the Super Admin account, then choose a document storage location on a different physical disk than the app. Once both exist, `SystemConfig.setupCompletedAt` is set and `/setup` redirects to `/login` from then on (re-checked, cached in memory after the first `true` so it isn't a DB hit on every request forever)
+- **The "different disk" check** (`src/lib/storage-path.ts`) — Windows compares drive letters (a UNC/network path always passes automatically, since it can never be the same physical disk), POSIX compares the filesystem device id. Tested for real, not just by reading the code: created a synthetic second drive letter with Windows' `subst` to force a genuine cross-drive comparison, confirmed the same-disk case is correctly rejected and the different-disk case correctly succeeds (directory gets created and write-tested), and confirmed the hint text correctly names the app's actual drive
+- Building this exposed that `auth` from NextAuth isn't callable as `auth(request)` directly — it only works that way when exported as *the* proxy function with nothing wrapping it. Needing the setup-gate to run first meant wrapping a custom callback (`auth((req) => ...)`) instead, which bypasses `authConfig`'s `authorized` callback entirely — so the login-redirect logic that used to live there now lives directly in `proxy.ts` instead
+- The seed script now also completes setup (a local `./dev-storage` folder, no real disk-separation needed for dev data) — otherwise every fresh `npm run dev` would land on `/setup` instead of `/login`, contradicting this README
+- Found two real bugs by testing beyond dev mode, one of them severe:
+  - **Login was completely broken under `next start` (production mode)** — every credentials login failed with a 500 (`UntrustedHost`). NextAuth requires either a trusted-platform host header (Vercel, etc.) or an explicit opt-in; this app is always self-hosted, so it never had either. `npm run dev` never surfaced this at all — this is a repeat of the exact lesson from `proxy.ts`'s Next.js 16 rename: **`npm run build` + `npm run start` is required to trust that a change actually works**, not just `npm run dev`. Fixed with `trustHost: true` in `src/auth.config.ts`.
+  - **A genuine race condition** in `addInitialStorageLocation` (check-then-act on "is there already an active storage location," no transaction between the two) — reproduced it for real with two genuinely concurrent requests against two synthetic Windows drives, though the first attempt didn't happen to trigger it (lucky timing, not safety). Closed at the database level with a partial unique index (`StorageLocation(isActive) WHERE isActive = 1`, migration `20260809055955`) rather than relying on the application-level check, then re-verified under real concurrency that it now fails safely with a friendly error instead of either duplicating the row or throwing an unhandled 500
 
 What phase 2 actually added:
 - **WAL mode**, set once via a migration since (unlike `busy_timeout`) it's a durable property of the database file itself, not a per-connection setting
@@ -74,7 +83,7 @@ SQLite has no native enum type, so every "enum-like" column (`role`, `status`, `
 | `npm run db:studio` | Open Prisma Studio (database GUI) |
 | `npm run lint` | ESLint |
 
-Once the app is actually deployed for real use, first-run setup requires the Super Admin to choose a document storage location on a **different physical disk** than the app itself (Section 5 of the plan) — that wizard doesn't exist yet.
+A genuinely fresh install (no seed data) lands on `/setup` first — see "What phase 3 actually added" above.
 
 For production deployment (self-hosted, LAN-only, copy-paste portable), see Section 8 of the plan.
 

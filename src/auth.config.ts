@@ -12,6 +12,14 @@ export const authConfig = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [],
+  // NextAuth rejects requests whose Host header isn't "trusted" unless
+  // told otherwise — normally satisfied by a platform like Vercel that
+  // supplies verified host headers. This app is always self-hosted
+  // (Section 8: LAN-only, reached via the host's own IP, never behind a
+  // platform like that), so there's no other source of trust to rely on.
+  // Found this the hard way: without it, every login fails outright with
+  // a 500 in production mode (`next start`) — dev mode didn't surface it.
+  trustHost: true,
   callbacks: {
     // Carries agencyId + role from the initial sign-in's User object into
     // the JWT itself, so later requests never need a DB round-trip just to
@@ -29,20 +37,12 @@ export const authConfig = {
       session.user.role = token.role;
       return session;
     },
-    // Gates every route except /login. NextAuth redirects to pages.signIn
-    // (preserving the original URL as callbackUrl) whenever this returns
-    // false, so route-level protection lives in one place.
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const isLoginPage = nextUrl.pathname === "/login";
-
-      if (isLoginPage) {
-        // Already signed in and hitting /login: bounce to the dashboard
-        // instead of returning false, which would redirect back to /login
-        // and loop forever.
-        return isLoggedIn ? Response.redirect(new URL("/dashboard", nextUrl)) : true;
-      }
-      return isLoggedIn;
-    },
+    // No `authorized` callback here — that pattern only fires when `auth`
+    // is exported directly as the proxy function. Once proxy.ts needed to
+    // run its own setup-gate logic first (Section 10 phase 3), it switched
+    // to wrapping a custom middleware function instead (`auth((req) =>
+    // ...)`), which bypasses `authorized` entirely — so the equivalent
+    // "redirect to /login unless authenticated" logic now lives directly
+    // in proxy.ts instead of here.
   },
 } satisfies NextAuthConfig;

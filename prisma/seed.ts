@@ -4,6 +4,7 @@
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import bcrypt from "bcryptjs";
+import fs from "node:fs";
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env.DATABASE_URL ?? "file:./dev.db",
@@ -38,6 +39,29 @@ async function main() {
       role: "super_admin",
     },
   });
+
+  // Also mark first-run setup complete (Section 10 phase 3), so `npm run
+  // dev` against freshly seeded data goes straight to /login like the
+  // README says, instead of stopping at the /setup wizard every time. The
+  // wizard's own "different disk" validation is a UI-time check, not a DB
+  // constraint, so this dev-only path doesn't need to satisfy it — real
+  // first-run setup (scripts/watchdog.mjs's production use case) still
+  // goes through the real wizard at prisma/../src/app/setup.
+  const existingStorage = await prisma.storageLocation.findFirst({ where: { isActive: true } });
+  if (!existingStorage) {
+    fs.mkdirSync("./dev-storage", { recursive: true });
+    await prisma.storageLocation.create({
+      data: { path: "./dev-storage", label: "Local dev storage (seed script)", isActive: true },
+    });
+  }
+  const existingConfig = await prisma.systemConfig.findFirst();
+  if (existingConfig) {
+    if (!existingConfig.setupCompletedAt) {
+      await prisma.systemConfig.update({ where: { id: existingConfig.id }, data: { setupCompletedAt: new Date() } });
+    }
+  } else {
+    await prisma.systemConfig.create({ data: { setupCompletedAt: new Date() } });
+  }
 
   const agencySpecs = [
     {
