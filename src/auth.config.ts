@@ -2,9 +2,12 @@ import type { NextAuthConfig, Session } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 
 // Deliberately has no providers and no Prisma/bcrypt imports — this config
-// is also loaded by middleware.ts, which runs in the Edge runtime and can't
-// use the SQLite driver adapter. The Credentials provider (which needs
-// Node.js) lives only in auth.ts, which extends this config.
+// is also loaded by proxy.ts. Next.js 16 runs Proxy on the Node.js runtime
+// by default (it was Edge-only pre-v16), so this split isn't strictly
+// required anymore for driver-adapter compatibility, but it's kept anyway:
+// proxy.ts should stay dependency-light regardless of which runtime it
+// happens to run on. The Credentials provider (Prisma + bcrypt) lives only
+// in auth.ts, which extends this config.
 export const authConfig = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },

@@ -10,14 +10,14 @@ What phase 4 actually added:
 - **Auth.js (NextAuth v5)** with a Credentials provider — email/password checked against `User.passwordHash` (bcrypt)
 - **Login security baseline** (Section 5): 10-char minimum enforced wherever passwords are set (not yet — there's no set-password UI yet, only the seed script), and lockout after 5 consecutive failed attempts for 15 minutes, tracked on `User.failedLoginAttempts`/`lockedUntil`
 - Every login attempt (success, failure, or attempted-while-locked) is written to `ActivityLog`
-- **Session carries `agencyId` and `role`** (Section 7), via JWT so middleware can check it on the Edge without a DB call
-- **`src/middleware.ts`** blocks every route except `/login` for unauthenticated requests
+- **Session carries `agencyId` and `role`** (Section 7), via JWT so `src/proxy.ts` can check it without a DB call on every request
+- **`src/proxy.ts`** blocks every route except `/login` for unauthenticated requests (this is Next.js 16's renamed `middleware.ts` convention — see the note below)
 - **`src/lib/tenant-db.ts`** — the centralized tenant-scoping data-access layer Section 2 asks for: `getScopedPrisma(agencyId)` returns a Prisma Client where every operation on a tenant-scoped model is confined to that one agency automatically. Single-record operations (`findUnique`/`update`/`delete`) verify ownership before running, not after, so a cross-tenant id is never fetched, updated, or deleted — see the comment at the top of that file for the exact mechanism and its one real caveat (nested relation writes aren't auto-scoped)
 - A minimal `/dashboard` page proving it end-to-end: Super Admin sees every agency; an agency user sees only their own agency's leads, fetched through the scoped client
 
 A few items in the plan's Section 12 still need confirmation before or during the build (draft insurance-line field lists, the legal data-retention period, and some external logistics like drive sourcing and trademark clearance) — see that section for the current list.
 
-**Note on the Next.js version**: this scaffold used Next.js 16, which is new enough that its own generated `AGENTS.md` warns that App Router conventions may differ from older training data. Before writing route/page code, check `node_modules/next/dist/docs/` rather than assuming Next 13–15 patterns still apply.
+**Note on the Next.js version**: this scaffold used Next.js 16, which is new enough that its own generated `AGENTS.md` warns that App Router conventions may differ from older training data. Before writing route/page code, check `node_modules/next/dist/docs/` rather than assuming Next 13–15 patterns still apply. Concretely: Next.js 16 renamed the `middleware.ts` file convention to `proxy.ts` (default export or a named `proxy` export required — `npm run dev` didn't catch this, only `npm run build` did) and changed its default runtime from Edge to Node.js. **Always run a production build, not just `npm run dev`, before calling a change done** — dev mode silently tolerated the old `middleware.ts` file with no warning.
 
 ## Tech stack (as actually scaffolded)
 
@@ -34,8 +34,8 @@ SQLite has no native enum type, so every "enum-like" column (`role`, `status`, `
 1. Install [Node.js](https://nodejs.org/) 22+ (this project was scaffolded on Node 24)
 2. Clone the repo and install dependencies:
    ```sh
-   git clone https://github.com/matbautista/sardipa-suite.git
-   cd sardipa-suite
+   git clone https://github.com/matbautista/saripda-suite.git
+   cd saripda-suite
    npm install
    ```
 3. Copy the environment file and generate a real `AUTH_SECRET`:

@@ -4,8 +4,8 @@ import { authConfig } from "@/auth.config";
 import { verifyCredentials } from "@/lib/login";
 
 // Full config — Node-only, uses Prisma/bcrypt via verifyCredentials. Used in
-// server components, route handlers, and server actions. middleware.ts uses
-// authConfig directly instead, since it must stay Edge-compatible.
+// server components, route handlers, and server actions. proxy.ts uses
+// authConfig directly instead, without the Credentials provider.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [

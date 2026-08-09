@@ -3,9 +3,9 @@ import { auth } from "@/auth";
 
 /**
  * For use in server components/route handlers that are already behind
- * middleware's auth gate (src/middleware.ts) — this just gives a
- * conveniently typed, non-null session, with a redirect as a defense-in-
- * depth fallback rather than the only line of protection.
+ * proxy.ts's auth gate — this just gives a conveniently typed, non-null
+ * session, with a redirect as a defense-in-depth fallback rather than the
+ * only line of protection.
  */
 export async function requireSession() {
   const session = await auth();
