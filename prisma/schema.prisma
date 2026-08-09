@@ -460,8 +460,10 @@ model TravelDetail {
 
 model ActivityLog {
   id        String   @id @default(cuid())
-  agencyId  String
-  agency    Agency   @relation(fields: [agencyId], references: [id])
+  // Nullable like SystemAlert.agencyId: null for a Super Admin's own actions
+  // (e.g. their login), since Super Admin sits outside every agency
+  agencyId  String?
+  agency    Agency?  @relation(fields: [agencyId], references: [id])
   // Document actions log against their parent policyId, since Document has
   // no column of its own here; login/user-management events set neither
   leadId    String?
