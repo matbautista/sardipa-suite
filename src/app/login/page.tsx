@@ -24,9 +24,9 @@ async function loginAction(formData: FormData) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; passwordChanged?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, passwordChanged } = await searchParams;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
@@ -34,6 +34,11 @@ export default async function LoginPage({
         <h1 className="text-xl font-semibold text-gray-900">Saripda Suite</h1>
         <p className="mt-1 text-sm text-gray-500">Sign in to continue</p>
 
+        {passwordChanged && !error && (
+          <p className="mt-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+            Password changed — sign in with your new password.
+          </p>
+        )}
         {error && (
           <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             Incorrect email or password, or this account is locked/inactive.

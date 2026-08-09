@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { getScopedPrisma } from "@/lib/tenant-db";
 import { prisma } from "@/lib/prisma";
@@ -48,13 +49,21 @@ export default async function DashboardPage() {
 
       {isSuperAdmin ? (
         <div className="mt-8">
-          <h2 className="text-sm font-medium text-gray-700">Agencies on this installation</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-700">Agencies on this installation</h2>
+            <Link href="/admin/agencies" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Manage agencies
+            </Link>
+          </div>
           <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
             {agencies.map((agency) => (
               <li key={agency.id} className="px-4 py-3 text-sm text-gray-800">
                 {agency.name}
               </li>
             ))}
+            {agencies.length === 0 && (
+              <li className="px-4 py-3 text-sm text-gray-400">No agencies yet.</li>
+            )}
           </ul>
         </div>
       ) : (

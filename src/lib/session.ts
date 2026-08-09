@@ -23,3 +23,16 @@ export async function requireAgencySession() {
   }
   return session as typeof session & { user: { agencyId: string } };
 }
+
+/**
+ * Throws if called from a non-Super-Admin session — use for /admin pages.
+ * proxy.ts already redirects non-Super-Admins away from /admin/*, so this
+ * is defense-in-depth, not the only line of protection.
+ */
+export async function requireSuperAdminSession() {
+  const session = await requireSession();
+  if (session.user.role !== "super_admin") {
+    throw new Error("This page requires a Super Admin session");
+  }
+  return session;
+}

@@ -98,6 +98,12 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  // Account-creation flow (Section 5): a temporary password is shown once
+  // to whoever created the account, and the new user is prompted to change
+  // it on first login. False for accounts that set their own password
+  // (Super Admin during first-run setup) or seeded dev accounts.
+  mustChangePassword Boolean @default(false)
+
   // Sub-team scoping (Section 3): only meaningful when role = agent.
   // Null means "unassigned", visible only to the Agency Head.
   managerId     String?

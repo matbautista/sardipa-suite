@@ -21,13 +21,19 @@ export const authConfig = {
   // a 500 in production mode (`next start`) — dev mode didn't surface it.
   trustHost: true,
   callbacks: {
-    // Carries agencyId + role from the initial sign-in's User object into
-    // the JWT itself, so later requests never need a DB round-trip just to
-    // know who's asking (Section 7 of the plan).
+    // Carries agencyId + role + mustChangePassword from the initial
+    // sign-in's User object into the JWT itself, so later requests never
+    // need a DB round-trip just to know who's asking (Section 7 of the
+    // plan). Note this means mustChangePassword is a snapshot from
+    // login time — after a successful password change, the user is
+    // signed out and must log in again for a fresh JWT to pick up the
+    // new value, rather than the app trying to patch an already-issued
+    // token in place.
     jwt({ token, user }) {
       if (user) {
         token.agencyId = user.agencyId;
         token.role = user.role;
+        token.mustChangePassword = user.mustChangePassword;
       }
       return token;
     },
@@ -35,6 +41,7 @@ export const authConfig = {
       session.user.id = token.sub!;
       session.user.agencyId = token.agencyId;
       session.user.role = token.role;
+      session.user.mustChangePassword = token.mustChangePassword;
       return session;
     },
     // No `authorized` callback here — that pattern only fires when `auth`

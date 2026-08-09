@@ -1,15 +1,12 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { isDifferentDisk, ensureWritableDirectory } from "@/lib/storage-path";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
 
 // First-run setup wizard (Section 10 phase 3 / Section 5's System
 // Configuration): the app blocks normal use until a Super Admin account
 // exists and at least one active StorageLocation is configured — see
 // SystemConfig.setupCompletedAt in prisma/schema.prisma.
-
-// Same policy as login (Section 5's login security baseline) — this is
-// the first real place a password actually gets set, so it's enforced here.
-const MIN_PASSWORD_LENGTH = 10;
 
 // Once true, setup can never become "not complete" again during normal
 // operation — cache it so proxy.ts isn't hitting the DB on every request

@@ -24,6 +24,11 @@ import { isSetupComplete } from "@/lib/setup";
 //  2. Auth gate: redirect to /login unless signed in (preserving the
 //     original URL as callbackUrl), and bounce an already-signed-in user
 //     away from /login instead of looping.
+//  3. Change-password gate (Section 5/10 phase 5): a temporary-password
+//     account (mustChangePassword) is forced to /change-password before
+//     anything else, same "block everything until this one thing is
+//     done" shape as the setup gate above.
+//  4. Role gate: /admin/* is Super Admin only.
 const { auth } = NextAuth(authConfig);
 
 export const proxy = auth(async (req) => {
@@ -50,6 +55,17 @@ export const proxy = auth(async (req) => {
     loginUrl.searchParams.set("callbackUrl", req.nextUrl.href);
     return NextResponse.redirect(loginUrl);
   }
+
+  const user = req.auth!.user;
+
+  if (user.mustChangePassword && pathname !== "/change-password") {
+    return NextResponse.redirect(new URL("/change-password", req.nextUrl));
+  }
+
+  if (pathname.startsWith("/admin") && user.role !== "super_admin") {
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  }
+
   return NextResponse.next();
 });
 

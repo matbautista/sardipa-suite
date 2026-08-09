@@ -8,7 +8,17 @@ const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_MINUTES = 15;
 
 export type LoginResult =
-  | { ok: true; user: { id: string; agencyId: string | null; role: string; name: string; email: string } }
+  | {
+      ok: true;
+      user: {
+        id: string;
+        agencyId: string | null;
+        role: string;
+        name: string;
+        email: string;
+        mustChangePassword: boolean;
+      };
+    }
   | { ok: false; reason: "invalid_credentials" | "account_inactive" | "account_locked" };
 
 /**
@@ -65,7 +75,14 @@ export async function verifyCredentials(email: string, password: string): Promis
 
   return {
     ok: true,
-    user: { id: user.id, agencyId: user.agencyId, role: user.role, name: user.name, email: user.email },
+    user: {
+      id: user.id,
+      agencyId: user.agencyId,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      mustChangePassword: user.mustChangePassword,
+    },
   };
 }
 
