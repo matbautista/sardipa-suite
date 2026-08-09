@@ -28,7 +28,7 @@ import { isSetupComplete } from "@/lib/setup";
 //     account (mustChangePassword) is forced to /change-password before
 //     anything else, same "block everything until this one thing is
 //     done" shape as the setup gate above.
-//  4. Role gate: /admin/* is Super Admin only.
+//  4. Role gate: /admin/* is Super Admin only, /agency/* is Agency Head only.
 const { auth } = NextAuth(authConfig);
 
 export const proxy = auth(async (req) => {
@@ -63,6 +63,10 @@ export const proxy = auth(async (req) => {
   }
 
   if (pathname.startsWith("/admin") && user.role !== "super_admin") {
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  }
+
+  if (pathname.startsWith("/agency") && user.role !== "head") {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 

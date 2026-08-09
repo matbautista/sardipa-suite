@@ -36,3 +36,17 @@ export async function requireSuperAdminSession() {
   }
   return session;
 }
+
+/**
+ * Throws if called from a non-Agency-Head session — use for /agency pages
+ * (Section 3: configuring insurance lines/products and managing
+ * Managers/Agents is Head-only, not Manager or Agent). proxy.ts already
+ * redirects non-Heads away from /agency/*, so this is defense-in-depth.
+ */
+export async function requireHeadSession() {
+  const session = await requireAgencySession();
+  if (session.user.role !== "head") {
+    throw new Error("This page requires an Agency Head session");
+  }
+  return session;
+}

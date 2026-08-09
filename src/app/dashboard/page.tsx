@@ -68,6 +68,16 @@ export default async function DashboardPage() {
         </div>
       ) : (
         <div className="mt-8">
+          {user.role === "head" && (
+            <div className="mb-6 flex gap-4">
+              <Link href="/agency/lines" className="text-sm text-gray-500 underline hover:text-gray-800">
+                Insurance lines &amp; products
+              </Link>
+              <Link href="/agency/users" className="text-sm text-gray-500 underline hover:text-gray-800">
+                Managers &amp; agents
+              </Link>
+            </div>
+          )}
           <h2 className="text-sm font-medium text-gray-700">Leads in your agency</h2>
           <p className="mt-1 text-xs text-gray-400">
             Fetched through the tenant-scoped data-access layer — every row below is
