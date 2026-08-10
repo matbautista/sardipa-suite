@@ -1,8 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getOwnLead, updateLead, deleteLead, type LeadInput } from "@/lib/leads";
 import { listInsuranceLines } from "@/lib/insurance-lines";
+import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+
+const RECORD_TYPE = "lead";
 
 const STATUSES = ["new", "contacted", "quoted", "negotiating", "won", "lost"] as const;
 
@@ -37,6 +39,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     if (!result.ok) {
       redirect(`/leads/${id}?error=${encodeURIComponent(result.error)}`);
     }
+    // "Checked in automatically when the editor saves" (Section 5).
+    await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
     redirect(`/leads/${id}`);
   }
 
@@ -44,6 +48,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     "use server";
     const session = await requireAgencySession();
     await deleteLead(session.user.agencyId, session.user.id, id);
+    await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
+    redirect("/leads");
+  }
+
+  // "Checked in automatically when... navigating away/closes the edit
+  // form" (Section 5) — the one exit path this app can reliably catch
+  // server-side. Anything less deliberate (back button, closing the tab)
+  // falls back to the lock's own auto-release timeout, same as the plan
+  // expects ("covers someone closing their browser without properly
+  // exiting the form").
+  async function backToLeadsAction() {
+    "use server";
+    const session = await requireAgencySession();
+    await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
     redirect("/leads");
   }
 
@@ -56,18 +74,41 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
+  // Opening this page doubles as entering edit mode — there's no separate
+  // read-only view yet, since only the owner can reach this page at all
+  // (phase 7). Checking out immediately costs the owner nothing extra; see
+  // record-lock.ts for why the Manager/Head override isn't built yet.
+  const lockStatus = await getLockStatus(session.user.agencyId, session.user.id, RECORD_TYPE, id);
+  const lockedByOther = lockStatus.locked && !lockStatus.heldBySelf;
+  if (!lockedByOther) {
+    await checkOut(session.user.agencyId, session.user.id, RECORD_TYPE, id);
+  }
+
   const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">{lead.name}</h1>
-        <Link href="/leads" className="text-sm text-gray-500 underline hover:text-gray-800">
-          Back to my leads
-        </Link>
+        <form action={backToLeadsAction}>
+          <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
+            Back to my leads
+          </button>
+        </form>
       </div>
 
-      <form action={updateLeadAction} className="mt-8 space-y-4">
+      {lockedByOther && lockStatus.locked && (
+        <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Currently being edited by {lockStatus.holderName}, since{" "}
+          {lockStatus.lockedAt.toLocaleString()}. Read-only until they save or the lock expires.
+        </p>
+      )}
+
+      <form
+        action={updateLeadAction}
+        inert={lockedByOther}
+        className={`mt-8 space-y-4 ${lockedByOther ? "opacity-50" : ""}`}
+      >
         <div>
           <label className="block text-sm font-medium text-gray-700">Name</label>
           <input
@@ -184,11 +225,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </button>
       </form>
 
-      <form action={deleteLeadAction} className="mt-4">
-        <button type="submit" className="text-sm text-red-600 underline hover:text-red-800">
-          Delete this lead
-        </button>
-      </form>
+      {!lockedByOther && (
+        <form action={deleteLeadAction} className="mt-4">
+          <button type="submit" className="text-sm text-red-600 underline hover:text-red-800">
+            Delete this lead
+          </button>
+        </form>
+      )}
     </div>
   );
 }
