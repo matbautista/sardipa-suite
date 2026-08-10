@@ -1,4 +1,5 @@
 import { getScopedPrisma } from "@/lib/tenant-db";
+import { hasMinimumLifeInfo } from "@/lib/life-details";
 
 // Policies — general (Section 10 phase 9 / Section 5's "Sales / Policies"
 // and "Recording a Renewal / Payment"). Scoped to "my own policies" for
@@ -171,7 +172,7 @@ export async function updateDraftPolicy(
 
 export async function activatePolicy(agencyId: string, ownerId: string, policyId: string): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await scoped.policy.findUnique({ where: { id: policyId } });
+  const policy = await scoped.policy.findUnique({ where: { id: policyId }, include: { line: true } });
   if (!policy || policy.ownerId !== ownerId) {
     return { ok: false, error: "Policy not found." };
   }
@@ -181,10 +182,16 @@ export async function activatePolicy(agencyId: string, ownerId: string, policyId
   if (!policy.proofOfPaymentDocId) {
     return { ok: false, error: "Upload a Proof of Payment document before activating." };
   }
-  // Full per-line minimum-required-info gating (Section 11) arrives with
-  // phases 10-11's structured Life/Auto/Property/Health/Travel forms —
-  // Proof of Payment is the one requirement every line already shares, so
-  // it's the only gate this phase can actually enforce.
+  // Life's minimum-required-info gate (Section 11, phase 10). The other
+  // lines' checklists (Auto/Property/Health/Travel) arrive with phase 11 —
+  // until then, Proof of Payment is the only gate this function can
+  // enforce for those categories.
+  if (policy.line.category === "life") {
+    const hasLifeInfo = await hasMinimumLifeInfo(agencyId, policyId);
+    if (!hasLifeInfo) {
+      return { ok: false, error: "Fill in the Insured, Owner, and at least one Primary Beneficiary before activating." };
+    }
+  }
 
   await scoped.policy.update({ where: { id: policyId }, data: { status: "active" } });
   await scoped.activityLog.create({ data: { userId: ownerId, policyId, action: "policy_activated", note: null } });

@@ -25,6 +25,18 @@ async function main() {
   // break that cycle before either can be deleted (Section 10 phase 9).
   await prisma.policy.updateMany({ data: { proofOfPaymentDocId: null } });
   await prisma.document.deleteMany({});
+  // Every line-specific detail table hangs off policyId and must go before
+  // the Policy row itself — Life's three (phase 10) plus Auto/Travel's,
+  // scaffolded in the schema ahead of the phases that will populate them.
+  // Person rows (referenced by LifeInsured/LifeOwner.personId) are left as
+  // harmless orphans rather than cleaned up too, same tolerance already
+  // documented in src/lib/life-details.ts for the "same as insured" case.
+  await prisma.beneficiary.deleteMany({});
+  await prisma.lifeOwner.deleteMany({});
+  await prisma.lifeInsured.deleteMany({});
+  await prisma.autoOwner.deleteMany({});
+  await prisma.vehicle.deleteMany({});
+  await prisma.travelDetail.deleteMany({});
   await prisma.policy.deleteMany({});
   await prisma.lead.deleteMany({});
   await prisma.product.deleteMany({});

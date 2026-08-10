@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getOwnPolicy, updateDraftPolicy, activatePolicy, recordRenewal, type PolicyFormInput } from "@/lib/policies";
@@ -146,6 +147,13 @@ export default async function PolicyDetailPage({
         <p className="mt-1 text-xs text-gray-400">
           VUL fund balance: {policy.vulFundBalance ?? "not yet recorded"} (periodic balance updates aren&apos;t
           built yet — VUL policies don&apos;t lapse off the renewal date shown below).
+        </p>
+      )}
+      {policy.line.category === "life" && (
+        <p className="mt-2">
+          <Link href={`/policies/${policy.id}/life`} className="text-sm text-gray-500 underline hover:text-gray-800">
+            Insured, Owner &amp; Beneficiary details
+          </Link>
         </p>
       )}
 
