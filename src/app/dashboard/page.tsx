@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { listOwnLeads } from "@/lib/leads";
+import { getMyDashboardMetrics, LEAD_STATUS_LABELS } from "@/lib/dashboard-metrics";
 import { signOut } from "@/auth";
 
 // Demonstrates the auth + tenant-scoping foundation from Section 10 phase 4:
@@ -10,6 +11,21 @@ import { signOut } from "@/auth";
 // sees their team, Head sees the whole agency, Section 3) is phase 12 —
 // this dashboard only ever shows the signed-in user's own leads, same as
 // the full /leads CRUD page from phase 7.
+//
+// Phase 13's "Agent: my pipeline, my conversion rate, my sales this month,
+// follow-ups due" (Section 5) is shown here for every agency role, not just
+// Agent — a Manager/Head has their own leads/policies too, same reasoning
+// /leads and /policies already apply. The Manager/Head-only aggregate view
+// (leaderboard, conversion by line, revenue totals, funnel, trends) lives
+// at /team/dashboard, linked below.
+function pct(rate: number | null): string {
+  return rate === null ? "—" : `${Math.round(rate * 100)}%`;
+}
+
+function peso(amount: number): string {
+  return `₱${amount.toLocaleString()}`;
+}
+
 export default async function DashboardPage() {
   const session = await requireSession();
   const { user } = session;
@@ -20,7 +36,11 @@ export default async function DashboardPage() {
     ? await prisma.agency.findMany({ orderBy: { name: "asc" } })
     : [];
 
-  const leads = !isSuperAdmin ? await listOwnLeads(user.agencyId!, user.id) : [];
+  let leads: Awaited<ReturnType<typeof listOwnLeads>> = [];
+  let metrics: Awaited<ReturnType<typeof getMyDashboardMetrics>> | null = null;
+  if (!isSuperAdmin) {
+    [leads, metrics] = await Promise.all([listOwnLeads(user.agencyId!, user.id), getMyDashboardMetrics(user.agencyId!, user.id)]);
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -83,8 +103,59 @@ export default async function DashboardPage() {
               <Link href="/team/policies" className="text-sm text-gray-500 underline hover:text-gray-800">
                 {user.role === "head" ? "Agency policies" : "Team policies"}
               </Link>
+              <Link href="/team/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
+                {user.role === "head" ? "Agency dashboard" : "Team dashboard"}
+              </Link>
             </div>
           )}
+
+          {metrics && (
+            <div className="mb-8">
+              <h2 className="text-sm font-medium text-gray-700">My pipeline</h2>
+              <div className="mt-2 grid grid-cols-3 gap-3 sm:grid-cols-6">
+                {metrics.pipeline.map(({ status, count }) => (
+                  <div key={status} className="rounded-md border border-gray-200 px-3 py-2">
+                    <p className="text-xs text-gray-500">{LEAD_STATUS_LABELS[status] ?? status}</p>
+                    <p className="mt-0.5 text-lg font-semibold text-gray-900">{count}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div className="rounded-md border border-gray-200 px-3 py-2">
+                  <p className="text-xs text-gray-500">My conversion rate</p>
+                  <p className="mt-0.5 text-lg font-semibold text-gray-900">{pct(metrics.conversionRate)}</p>
+                </div>
+                <div className="rounded-md border border-gray-200 px-3 py-2">
+                  <p className="text-xs text-gray-500">Sales this month</p>
+                  <p className="mt-0.5 text-lg font-semibold text-gray-900">
+                    {metrics.salesThisMonth.count} &middot; {peso(metrics.salesThisMonth.premium)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h3 className="text-xs font-medium text-gray-500">Follow-ups due</h3>
+                <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
+                  {metrics.followUps.slice(0, 5).map((item) => (
+                    <li key={`${item.type}-${item.id}`} className="flex items-center justify-between px-4 py-2 text-sm">
+                      <Link href={item.href} className="text-gray-800 hover:underline">
+                        {item.label}
+                      </Link>
+                      <span className={item.overdue ? "text-red-600" : "text-gray-400"}>
+                        {item.dueDate.toLocaleDateString()}
+                        {item.overdue ? " · overdue" : ""}
+                      </span>
+                    </li>
+                  ))}
+                  {metrics.followUps.length === 0 && (
+                    <li className="px-4 py-2 text-sm text-gray-400">Nothing due.</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-gray-700">Your leads</h2>
             <div className="flex gap-4">

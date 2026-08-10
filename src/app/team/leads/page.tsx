@@ -86,6 +86,9 @@ export default async function TeamLeadsPage({
           <Link href="/team/policies" className="text-sm text-gray-500 underline hover:text-gray-800">
             Team policies
           </Link>
+          <Link href="/team/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
+            Team dashboard
+          </Link>
           <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
             Back to dashboard
           </Link>
