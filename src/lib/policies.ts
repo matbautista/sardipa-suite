@@ -42,7 +42,7 @@ export async function getOwnPolicy(agencyId: string, ownerId: string, policyId: 
   const scoped = getScopedPrisma(agencyId);
   const policy = await scoped.policy.findUnique({
     where: { id: policyId },
-    include: { line: true, product: true, lead: true },
+    include: { line: true, product: true, lead: true, owner: true },
   });
   if (!policy || policy.ownerId !== ownerId) {
     return null;
@@ -174,7 +174,17 @@ export async function updateDraftPolicy(
   return { ok: true };
 }
 
-export async function activatePolicy(agencyId: string, ownerId: string, policyId: string): Promise<ActionResult> {
+// ownerId: whose policy this is, for the access check (may be resolved to
+// someone other than the caller by team-access.ts, phase 12). actorId: who
+// is actually clicking the button — always the real caller, never resolved
+// — since ActivityLog must attribute to "the actual actor (not the
+// subject)" (Section 5's Audit/Activity Log requirement).
+export async function activatePolicy(
+  agencyId: string,
+  ownerId: string,
+  actorId: string,
+  policyId: string
+): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
   const policy = await scoped.policy.findUnique({ where: { id: policyId }, include: { line: true } });
   if (!policy || policy.ownerId !== ownerId) {
@@ -206,7 +216,7 @@ export async function activatePolicy(agencyId: string, ownerId: string, policyId
   }
 
   await scoped.policy.update({ where: { id: policyId }, data: { status: "active" } });
-  await scoped.activityLog.create({ data: { userId: ownerId, policyId, action: "policy_activated", note: null } });
+  await scoped.activityLog.create({ data: { userId: actorId, policyId, action: "policy_activated", note: null } });
 
   return { ok: true };
 }
@@ -215,7 +225,12 @@ export async function activatePolicy(agencyId: string, ownerId: string, policyId
 // Renewal / Payment") — the caller is expected to have already uploaded a
 // new Proof of Payment document via uploadDocument() before calling this,
 // which is what actually satisfies step 1 of that section.
-export async function recordRenewal(agencyId: string, ownerId: string, policyId: string): Promise<ActionResult> {
+export async function recordRenewal(
+  agencyId: string,
+  ownerId: string,
+  actorId: string,
+  policyId: string
+): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
   const policy = await scoped.policy.findUnique({ where: { id: policyId } });
   if (!policy || policy.ownerId !== ownerId) {
@@ -241,7 +256,33 @@ export async function recordRenewal(agencyId: string, ownerId: string, policyId:
     where: { id: policyId },
     data: { status: "active", gracePeriodEndsAt: null, renewalDate: newRenewalDate },
   });
-  await scoped.activityLog.create({ data: { userId: ownerId, policyId, action: "policy_renewed", note: null } });
+  await scoped.activityLog.create({ data: { userId: actorId, policyId, action: "policy_renewed", note: null } });
 
   return { ok: true };
+}
+
+// undefined = no such policy in this agency; string = its owner. Every
+// policy has an owner (unlike Lead, whose ownerId is nullable), so there's
+// no "unassigned" case to represent here (Section 10 phase 12).
+export async function getPolicyOwnerId(agencyId: string, policyId: string): Promise<string | undefined> {
+  const scoped = getScopedPrisma(agencyId);
+  const policy = await scoped.policy.findUnique({ where: { id: policyId } });
+  return policy?.ownerId;
+}
+
+export type TeamPolicyFilters = { status?: string; ownerId?: string };
+
+// Manager/Head cross-visibility list (Section 10 phase 12) — same shape as
+// leads.ts's listTeamLeads: `ownerIds` is resolved by the caller via
+// getTeamMemberIds() first.
+export async function listTeamPolicies(agencyId: string, ownerIds: string[], filters: TeamPolicyFilters = {}) {
+  const scoped = getScopedPrisma(agencyId);
+  return scoped.policy.findMany({
+    where: {
+      ownerId: filters.ownerId ? filters.ownerId : { in: ownerIds },
+      ...(filters.status ? { status: filters.status } : {}),
+    },
+    orderBy: { startDate: "desc" },
+    include: { line: true, product: true, owner: true },
+  });
 }

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getScopedPrisma } from "@/lib/tenant-db";
 import { ensureWritableDirectory } from "@/lib/storage-path";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 // Document upload/storage (Section 10 phase 9 / Section 5's "How Documents
 // Are Saved" and "Upload Limits & Image Sizing"). Client-side image
@@ -26,10 +27,15 @@ const VALID_DOC_TYPES = ["proof_of_payment", "valid_id", "other"] as const;
 
 type UploadResult = { ok: true; documentId: string } | { ok: false; error: string };
 
+// ownerId: whose policy this is, for the access check (may be resolved to
+// someone other than the caller by team-access.ts, phase 12). actorId: who
+// actually uploaded it — always the real caller, stored as
+// Document.uploadedBy, never resolved to the policy's owner.
 export async function uploadDocument(
   agencyId: string,
   policyId: string,
-  uploaderId: string,
+  ownerId: string,
+  actorId: string,
   docType: string,
   file: File
 ): Promise<UploadResult> {
@@ -49,7 +55,7 @@ export async function uploadDocument(
 
   const scoped = getScopedPrisma(agencyId);
   const policy = await scoped.policy.findUnique({ where: { id: policyId } });
-  if (!policy || policy.ownerId !== uploaderId) {
+  if (!policy || policy.ownerId !== ownerId) {
     return { ok: false, error: "Policy not found." };
   }
 
@@ -82,7 +88,7 @@ export async function uploadDocument(
       type: docType,
       filePath: relativePath,
       fileSizeBytes: file.size,
-      uploadedBy: uploaderId,
+      uploadedBy: actorId,
     },
   });
 
@@ -109,9 +115,15 @@ export async function listPolicyDocuments(agencyId: string, ownerId: string, pol
 
 type DownloadableDocument = { absolutePath: string; fileName: string; contentType: string };
 
+// This route can't resolve "which owner's records may the caller touch"
+// up front the way a policy detail page can — a document download only
+// ever gets a documentId, not the policyId needed to check first — so
+// unlike everywhere else in this file, the resolution happens inside this
+// function itself rather than being handed a pre-resolved ownerId.
 export async function getDocumentForDownload(
   agencyId: string,
   callerId: string,
+  role: string,
   documentId: string
 ): Promise<DownloadableDocument | null> {
   const scoped = getScopedPrisma(agencyId);
@@ -119,9 +131,11 @@ export async function getDocumentForDownload(
     where: { id: documentId },
     include: { policy: true, storageLocation: true },
   });
-  // Ownership mirrors leads/policies: the caller must own the policy this
-  // document belongs to, not just be in the same agency.
-  if (!document || document.policy.ownerId !== callerId) {
+  if (!document) {
+    return null;
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(agencyId, callerId, role, document.policy.ownerId);
+  if (!accessibleOwnerId) {
     return null;
   }
 

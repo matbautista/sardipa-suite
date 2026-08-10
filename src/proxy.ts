@@ -34,7 +34,9 @@ import { isSetupComplete } from "@/lib/setup";
 //     would otherwise throw an unhandled error instead of redirecting —
 //     caught live during a full-app review, Super Admin manually visiting
 //     either route crashed instead of bouncing to /dashboard like every
-//     other unauthorized case here).
+//     other unauthorized case here). /team/* is Manager and Head only
+//     (Section 10 phase 12) — unlike /leads and /policies, an Agent has no
+//     business here at all, not just a missing agencyId.
 const { auth } = NextAuth(authConfig);
 
 export const proxy = auth(async (req) => {
@@ -77,6 +79,10 @@ export const proxy = auth(async (req) => {
   }
 
   if ((pathname.startsWith("/leads") || pathname.startsWith("/policies")) && !user.agencyId) {
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  }
+
+  if (pathname.startsWith("/team") && user.role !== "manager" && user.role !== "head") {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 

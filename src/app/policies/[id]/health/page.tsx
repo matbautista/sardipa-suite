@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getHealthDetails, saveHealthDetails, type HealthDetailsInput } from "@/lib/health-details";
 import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getPolicyOwnerId } from "@/lib/policies";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "policy";
 
@@ -23,6 +25,20 @@ export default async function HealthDetailsPage({
   const { id } = await params;
   const { error } = await searchParams;
 
+  async function resolveOwnerOrRedirect(): Promise<string> {
+    "use server";
+    const session = await requireAgencySession();
+    const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+    if (recordOwnerId === undefined) {
+      redirect(`/policies/${id}`);
+    }
+    const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+    if (!accessibleOwnerId) {
+      redirect(`/policies/${id}`);
+    }
+    return accessibleOwnerId;
+  }
+
   async function backToPolicyAction() {
     "use server";
     const session = await requireAgencySession();
@@ -33,6 +49,7 @@ export default async function HealthDetailsPage({
   async function saveAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const input: HealthDetailsInput = {
       insuredName: String(formData.get("insuredName") ?? ""),
       insuredBirthdate: String(formData.get("insuredBirthdate") ?? ""),
@@ -42,7 +59,7 @@ export default async function HealthDetailsPage({
       roomBoardLimit: String(formData.get("roomBoardLimit") ?? ""),
       preexistingConditionDisclosure: String(formData.get("preexistingConditionDisclosure") ?? ""),
     };
-    const result = await saveHealthDetails(session.user.agencyId, session.user.id, id, input);
+    const result = await saveHealthDetails(session.user.agencyId, ownerId, id, input);
     if (!result.ok) {
       redirect(`/policies/${id}/health?error=${encodeURIComponent(result.error)}`);
     }
@@ -50,7 +67,16 @@ export default async function HealthDetailsPage({
     redirect(`/policies/${id}`);
   }
 
-  const detail = await getHealthDetails(session.user.agencyId, session.user.id, id);
+  const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+  if (recordOwnerId === undefined) {
+    notFound();
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+  if (!accessibleOwnerId) {
+    notFound();
+  }
+
+  const detail = await getHealthDetails(session.user.agencyId, accessibleOwnerId, id);
   if (detail === undefined) {
     notFound();
   }

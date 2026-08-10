@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
-import { getOwnLead, updateLead, deleteLead, type LeadInput } from "@/lib/leads";
+import { getOwnLead, getLeadOwnerId, updateLead, deleteLead, type LeadInput } from "@/lib/leads";
 import { listInsuranceLines } from "@/lib/insurance-lines";
 import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
 import { getPolicyForLead } from "@/lib/policies";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "lead";
 
@@ -34,14 +35,43 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const session = await requireAgencySession();
   const { id } = await params;
 
+  // Resolves "which owner's lead may this caller touch" once, the same
+  // pattern as policies/[id]/page.tsx (phase 12). Re-derives its own
+  // session rather than accepting one as a parameter — a plain closure
+  // referenced from inside another "use server" action isn't itself a
+  // valid server reference unless it's independently marked "use server",
+  // and a "use server" function's bound args must be plain serializable
+  // values, not a NextAuth session object. Redirects rather than
+  // notFound() inside a Server Action, since actions can't render a 404.
+  async function resolveOwnerOrRedirect(): Promise<string> {
+    "use server";
+    const session = await requireAgencySession();
+    const recordOwnerId = await getLeadOwnerId(session.user.agencyId, id);
+    if (recordOwnerId === undefined || recordOwnerId === null) {
+      redirect("/leads");
+    }
+    const accessibleOwnerId = await resolveAccessibleOwner(
+      session.user.agencyId,
+      session.user.id,
+      session.user.role,
+      recordOwnerId
+    );
+    if (!accessibleOwnerId) {
+      redirect("/leads");
+    }
+    return accessibleOwnerId;
+  }
+
   async function updateLeadAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
-    const result = await updateLead(session.user.agencyId, session.user.id, id, readLeadInput(formData));
+    const ownerId = await resolveOwnerOrRedirect();
+    const result = await updateLead(session.user.agencyId, ownerId, id, readLeadInput(formData));
     if (!result.ok) {
       redirect(`/leads/${id}?error=${encodeURIComponent(result.error)}`);
     }
-    // "Checked in automatically when the editor saves" (Section 5).
+    // "Checked in automatically when the editor saves" (Section 5) — always
+    // the real caller's lock, never the resolved owner's.
     await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
     redirect(`/leads/${id}`);
   }
@@ -49,7 +79,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   async function deleteLeadAction() {
     "use server";
     const session = await requireAgencySession();
-    await deleteLead(session.user.agencyId, session.user.id, id);
+    const ownerId = await resolveOwnerOrRedirect();
+    await deleteLead(session.user.agencyId, ownerId, id);
     await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
     redirect("/leads");
   }
@@ -64,11 +95,27 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     "use server";
     const session = await requireAgencySession();
     await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
-    redirect("/leads");
+    const recordOwnerId = await getLeadOwnerId(session.user.agencyId, id);
+    redirect(recordOwnerId === session.user.id ? "/leads" : "/team/leads");
   }
 
+  const recordOwnerId = await getLeadOwnerId(session.user.agencyId, id);
+  if (recordOwnerId === undefined || recordOwnerId === null) {
+    notFound();
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(
+    session.user.agencyId,
+    session.user.id,
+    session.user.role,
+    recordOwnerId
+  );
+  if (!accessibleOwnerId) {
+    notFound();
+  }
+  const viewingOwnRecord = accessibleOwnerId === session.user.id;
+
   const [lead, lines] = await Promise.all([
-    getOwnLead(session.user.agencyId, session.user.id, id),
+    getOwnLead(session.user.agencyId, accessibleOwnerId, id),
     listInsuranceLines(session.user.agencyId),
   ]);
 
@@ -77,9 +124,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   }
 
   // Opening this page doubles as entering edit mode — there's no separate
-  // read-only view yet, since only the owner can reach this page at all
-  // (phase 7). Checking out immediately costs the owner nothing extra; see
-  // record-lock.ts for why the Manager/Head override isn't built yet.
+  // read-only view yet. The lock itself is always keyed to the real caller
+  // (session.user.id), never the resolved owner — see record-lock.ts.
   const lockStatus = await getLockStatus(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   const lockedByOther = lockStatus.locked && !lockStatus.heldBySelf;
   if (!lockedByOther) {
@@ -87,7 +133,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   }
 
   const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
-  const existingPolicy = lead.status === "won" ? await getPolicyForLead(session.user.agencyId, session.user.id, id) : null;
+  const existingPolicy =
+    lead.status === "won" ? await getPolicyForLead(session.user.agencyId, accessibleOwnerId, id) : null;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
@@ -95,10 +142,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <h1 className="text-xl font-semibold text-gray-900">{lead.name}</h1>
         <form action={backToLeadsAction}>
           <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
-            Back to my leads
+            {viewingOwnRecord ? "Back to my leads" : "Back to team leads"}
           </button>
         </form>
       </div>
+
+      {!viewingOwnRecord && <p className="mt-1 text-sm text-gray-500">Owned by {lead.owner?.name ?? "—"}</p>}
 
       {lead.status === "won" && (
         <p className="mt-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">

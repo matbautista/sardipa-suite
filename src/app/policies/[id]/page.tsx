@@ -1,10 +1,18 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
-import { getOwnPolicy, updateDraftPolicy, activatePolicy, recordRenewal, type PolicyFormInput } from "@/lib/policies";
+import {
+  getOwnPolicy,
+  getPolicyOwnerId,
+  updateDraftPolicy,
+  activatePolicy,
+  recordRenewal,
+  type PolicyFormInput,
+} from "@/lib/policies";
 import { uploadDocument, listPolicyDocuments } from "@/lib/documents";
 import { listInsuranceLines } from "@/lib/insurance-lines";
 import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "policy";
 
@@ -49,10 +57,35 @@ export default async function PolicyDetailPage({
   const { id } = await params;
   const { error } = await searchParams;
 
+  // Resolves which owner's policy this caller may act on (phase 12's
+  // Manager/Head cross-visibility) — themselves, or (for Manager/Head) the
+  // record's real owner once resolveAccessibleOwner confirms access.
+  // Re-derives its own session rather than accepting one as a parameter — a
+  // plain closure referenced from inside another "use server" action isn't
+  // itself a valid server reference unless independently marked
+  // "use server", and a "use server" function's bound args must be plain
+  // serializable values, not a NextAuth session object. Redirects away
+  // rather than 404ing from inside a server action, since notFound() only
+  // works from a page render.
+  async function resolveOwnerOrRedirect(): Promise<string> {
+    "use server";
+    const session = await requireAgencySession();
+    const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+    if (recordOwnerId === undefined) {
+      redirect("/policies");
+    }
+    const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+    if (!accessibleOwnerId) {
+      redirect("/policies");
+    }
+    return accessibleOwnerId;
+  }
+
   async function updatePolicyAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
-    const result = await updateDraftPolicy(session.user.agencyId, session.user.id, id, readPolicyInput(formData));
+    const ownerId = await resolveOwnerOrRedirect();
+    const result = await updateDraftPolicy(session.user.agencyId, ownerId, id, readPolicyInput(formData));
     if (!result.ok) {
       redirect(`/policies/${id}?error=${encodeURIComponent(result.error)}`);
     }
@@ -63,7 +96,8 @@ export default async function PolicyDetailPage({
   async function activatePolicyAction() {
     "use server";
     const session = await requireAgencySession();
-    const result = await activatePolicy(session.user.agencyId, session.user.id, id);
+    const ownerId = await resolveOwnerOrRedirect();
+    const result = await activatePolicy(session.user.agencyId, ownerId, session.user.id, id);
     if (!result.ok) {
       redirect(`/policies/${id}?error=${encodeURIComponent(result.error)}`);
     }
@@ -73,9 +107,10 @@ export default async function PolicyDetailPage({
   async function uploadDocumentAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const file = formData.get("document") as File;
     const docType = String(formData.get("docType") ?? "");
-    const result = await uploadDocument(session.user.agencyId, id, session.user.id, docType, file);
+    const result = await uploadDocument(session.user.agencyId, id, ownerId, session.user.id, docType, file);
     if (!result.ok) {
       redirect(`/policies/${id}?error=${encodeURIComponent(result.error)}`);
     }
@@ -85,12 +120,13 @@ export default async function PolicyDetailPage({
   async function renewalPaymentAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const file = formData.get("document") as File;
-    const uploadResult = await uploadDocument(session.user.agencyId, id, session.user.id, "proof_of_payment", file);
+    const uploadResult = await uploadDocument(session.user.agencyId, id, ownerId, session.user.id, "proof_of_payment", file);
     if (!uploadResult.ok) {
       redirect(`/policies/${id}?error=${encodeURIComponent(uploadResult.error)}`);
     }
-    const result = await recordRenewal(session.user.agencyId, session.user.id, id);
+    const result = await recordRenewal(session.user.agencyId, ownerId, session.user.id, id);
     if (!result.ok) {
       redirect(`/policies/${id}?error=${encodeURIComponent(result.error)}`);
     }
@@ -101,10 +137,21 @@ export default async function PolicyDetailPage({
     "use server";
     const session = await requireAgencySession();
     await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
-    redirect("/policies");
+    const ownerId = await getPolicyOwnerId(session.user.agencyId, id);
+    redirect(ownerId === session.user.id ? "/policies" : "/team/policies");
   }
 
-  const policy = await getOwnPolicy(session.user.agencyId, session.user.id, id);
+  const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+  if (recordOwnerId === undefined) {
+    notFound();
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+  if (!accessibleOwnerId) {
+    notFound();
+  }
+  const viewingOwnRecord = accessibleOwnerId === session.user.id;
+
+  const policy = await getOwnPolicy(session.user.agencyId, accessibleOwnerId, id);
   if (!policy) {
     notFound();
   }
@@ -117,7 +164,7 @@ export default async function PolicyDetailPage({
 
   const [lines, documents] = await Promise.all([
     listInsuranceLines(session.user.agencyId),
-    listPolicyDocuments(session.user.agencyId, session.user.id, id),
+    listPolicyDocuments(session.user.agencyId, accessibleOwnerId, id),
   ]);
   const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
 
@@ -131,11 +178,14 @@ export default async function PolicyDetailPage({
         </h1>
         <form action={backToPoliciesAction}>
           <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
-            Back to my policies
+            {viewingOwnRecord ? "Back to my policies" : "Back to team policies"}
           </button>
         </form>
       </div>
 
+      {!viewingOwnRecord && (
+        <p className="mt-1 text-sm text-gray-500">Owned by {policy.owner.name}</p>
+      )}
       <p className="mt-1 text-sm text-gray-500">Status: {STATUS_LABELS[policy.status] ?? policy.status}</p>
       {policy.status === "grace_period" && policy.gracePeriodEndsAt && (
         <p className="mt-1 text-sm text-amber-700">

@@ -12,6 +12,8 @@ import {
   type BeneficiaryInput,
 } from "@/lib/life-details";
 import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getPolicyOwnerId } from "@/lib/policies";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "policy";
 
@@ -241,6 +243,21 @@ export default async function LifeDetailsPage({
   const { id } = await params;
   const { error } = await searchParams;
 
+  // Same "resolve access once" pattern as policies/[id]/page.tsx (phase 12).
+  async function resolveOwnerOrRedirect(): Promise<string> {
+    "use server";
+    const session = await requireAgencySession();
+    const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+    if (recordOwnerId === undefined) {
+      redirect(`/policies/${id}`);
+    }
+    const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+    if (!accessibleOwnerId) {
+      redirect(`/policies/${id}`);
+    }
+    return accessibleOwnerId;
+  }
+
   async function backToPolicyAction() {
     "use server";
     const session = await requireAgencySession();
@@ -251,8 +268,9 @@ export default async function LifeDetailsPage({
   async function saveInsuredAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const isSmoker = formData.get("isSmoker") === "on";
-    const result = await saveInsured(session.user.agencyId, session.user.id, id, isSmoker, readPersonInput(formData));
+    const result = await saveInsured(session.user.agencyId, ownerId, id, isSmoker, readPersonInput(formData));
     if (!result.ok) {
       redirect(`/policies/${id}/life?error=${encodeURIComponent(result.error)}`);
     }
@@ -262,6 +280,7 @@ export default async function LifeDetailsPage({
   async function saveOwnerAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const isSameAsInsured = formData.get("isSameAsInsured") === "on";
     const extra: OwnerExtraInput = {
       employerBusinessName: String(formData.get("employerBusinessName") ?? ""),
@@ -277,7 +296,7 @@ export default async function LifeDetailsPage({
     };
     const result = await saveOwner(
       session.user.agencyId,
-      session.user.id,
+      ownerId,
       id,
       isSameAsInsured,
       readPersonInput(formData),
@@ -292,6 +311,7 @@ export default async function LifeDetailsPage({
   async function saveBeneficiaryAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const beneficiaryType = String(formData.get("beneficiaryType") ?? "") as "primary" | "contingent";
     const slotNumber = Number(formData.get("slotNumber"));
     const input: BeneficiaryInput = {
@@ -303,7 +323,7 @@ export default async function LifeDetailsPage({
       mobileNo: String(formData.get("mobileNo") ?? ""),
       relationshipToInsured: String(formData.get("relationshipToInsured") ?? ""),
     };
-    const result = await saveBeneficiary(session.user.agencyId, session.user.id, id, beneficiaryType, slotNumber, input);
+    const result = await saveBeneficiary(session.user.agencyId, ownerId, id, beneficiaryType, slotNumber, input);
     if (!result.ok) {
       redirect(`/policies/${id}/life?error=${encodeURIComponent(result.error)}`);
     }
@@ -313,13 +333,23 @@ export default async function LifeDetailsPage({
   async function clearBeneficiaryAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const beneficiaryType = String(formData.get("beneficiaryType") ?? "");
     const slotNumber = Number(formData.get("slotNumber"));
-    await deleteBeneficiary(session.user.agencyId, session.user.id, id, beneficiaryType, slotNumber);
+    await deleteBeneficiary(session.user.agencyId, ownerId, id, beneficiaryType, slotNumber);
     redirect(`/policies/${id}/life`);
   }
 
-  const details = await getLifeDetails(session.user.agencyId, session.user.id, id);
+  const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+  if (recordOwnerId === undefined) {
+    notFound();
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+  if (!accessibleOwnerId) {
+    notFound();
+  }
+
+  const details = await getLifeDetails(session.user.agencyId, accessibleOwnerId, id);
   if (!details) {
     notFound();
   }

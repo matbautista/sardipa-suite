@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getAutoDetails, saveAutoDetails, type AutoDetailsInput } from "@/lib/auto-details";
 import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getPolicyOwnerId } from "@/lib/policies";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "policy";
 
@@ -19,6 +21,20 @@ export default async function AutoDetailsPage({
   const { id } = await params;
   const { error } = await searchParams;
 
+  async function resolveOwnerOrRedirect(): Promise<string> {
+    "use server";
+    const session = await requireAgencySession();
+    const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+    if (recordOwnerId === undefined) {
+      redirect(`/policies/${id}`);
+    }
+    const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+    if (!accessibleOwnerId) {
+      redirect(`/policies/${id}`);
+    }
+    return accessibleOwnerId;
+  }
+
   async function backToPolicyAction() {
     "use server";
     const session = await requireAgencySession();
@@ -29,13 +45,14 @@ export default async function AutoDetailsPage({
   async function saveAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const input: AutoDetailsInput = {
       completeName: String(formData.get("completeName") ?? ""),
       carMaker: String(formData.get("carMaker") ?? ""),
       carModel: String(formData.get("carModel") ?? ""),
       yearReleased: String(formData.get("yearReleased") ?? ""),
     };
-    const result = await saveAutoDetails(session.user.agencyId, session.user.id, id, input);
+    const result = await saveAutoDetails(session.user.agencyId, ownerId, id, input);
     if (!result.ok) {
       redirect(`/policies/${id}/auto?error=${encodeURIComponent(result.error)}`);
     }
@@ -43,7 +60,16 @@ export default async function AutoDetailsPage({
     redirect(`/policies/${id}`);
   }
 
-  const details = await getAutoDetails(session.user.agencyId, session.user.id, id);
+  const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+  if (recordOwnerId === undefined) {
+    notFound();
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+  if (!accessibleOwnerId) {
+    notFound();
+  }
+
+  const details = await getAutoDetails(session.user.agencyId, accessibleOwnerId, id);
   if (!details) {
     notFound();
   }

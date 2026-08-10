@@ -75,6 +75,16 @@ export default async function DashboardPage() {
               </Link>
             </div>
           )}
+          {(user.role === "manager" || user.role === "head") && (
+            <div className="mb-6 flex gap-4">
+              <Link href="/team/leads" className="text-sm text-gray-500 underline hover:text-gray-800">
+                {user.role === "head" ? "Agency leads" : "Team leads"}
+              </Link>
+              <Link href="/team/policies" className="text-sm text-gray-500 underline hover:text-gray-800">
+                {user.role === "head" ? "Agency policies" : "Team policies"}
+              </Link>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-gray-700">Your leads</h2>
             <div className="flex gap-4">

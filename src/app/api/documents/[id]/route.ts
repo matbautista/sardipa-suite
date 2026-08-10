@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const session = await requireAgencySession();
   const { id } = await params;
 
-  const document = await getDocumentForDownload(session.user.agencyId, session.user.id, id);
+  const document = await getDocumentForDownload(session.user.agencyId, session.user.id, session.user.role, id);
   if (!document) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getTravelDetails, saveTravelDetails, type TravelDetailsInput } from "@/lib/travel-details";
 import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getPolicyOwnerId } from "@/lib/policies";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "policy";
 const COVERAGE_TYPES = ["medical", "baggage", "trip_cancellation", "comprehensive"] as const;
@@ -20,6 +22,20 @@ export default async function TravelDetailsPage({
   const { id } = await params;
   const { error } = await searchParams;
 
+  async function resolveOwnerOrRedirect(): Promise<string> {
+    "use server";
+    const session = await requireAgencySession();
+    const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+    if (recordOwnerId === undefined) {
+      redirect(`/policies/${id}`);
+    }
+    const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+    if (!accessibleOwnerId) {
+      redirect(`/policies/${id}`);
+    }
+    return accessibleOwnerId;
+  }
+
   async function backToPolicyAction() {
     "use server";
     const session = await requireAgencySession();
@@ -30,6 +46,7 @@ export default async function TravelDetailsPage({
   async function saveAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const input: TravelDetailsInput = {
       travelerName: String(formData.get("travelerName") ?? ""),
       passportNo: String(formData.get("passportNo") ?? ""),
@@ -37,7 +54,7 @@ export default async function TravelDetailsPage({
       purposeOfTravel: String(formData.get("purposeOfTravel") ?? ""),
       coverageType: String(formData.get("coverageType") ?? ""),
     };
-    const result = await saveTravelDetails(session.user.agencyId, session.user.id, id, input);
+    const result = await saveTravelDetails(session.user.agencyId, ownerId, id, input);
     if (!result.ok) {
       redirect(`/policies/${id}/travel?error=${encodeURIComponent(result.error)}`);
     }
@@ -45,7 +62,16 @@ export default async function TravelDetailsPage({
     redirect(`/policies/${id}`);
   }
 
-  const detail = await getTravelDetails(session.user.agencyId, session.user.id, id);
+  const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+  if (recordOwnerId === undefined) {
+    notFound();
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+  if (!accessibleOwnerId) {
+    notFound();
+  }
+
+  const detail = await getTravelDetails(session.user.agencyId, accessibleOwnerId, id);
   if (detail === undefined) {
     notFound();
   }

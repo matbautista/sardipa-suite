@@ -50,3 +50,17 @@ export async function requireHeadSession() {
   }
   return session;
 }
+
+/**
+ * Throws if called from an Agent or Super Admin session — use for /team
+ * pages (Section 3/10 phase 12: cross-visibility into other agents' leads
+ * and policies is Manager/Head only). proxy.ts already redirects Agents
+ * away from /team/*, so this is defense-in-depth.
+ */
+export async function requireManagerOrHeadSession() {
+  const session = await requireAgencySession();
+  if (session.user.role !== "manager" && session.user.role !== "head") {
+    throw new Error("This page requires a Manager or Agency Head session");
+  }
+  return session;
+}

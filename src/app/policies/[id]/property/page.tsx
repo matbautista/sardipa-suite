@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getPropertyDetails, savePropertyDetails, type PropertyDetailsInput } from "@/lib/property-details";
 import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getPolicyOwnerId } from "@/lib/policies";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "policy";
 const CONSTRUCTION_TYPES = ["concrete", "wood", "mixed"] as const;
@@ -21,6 +23,20 @@ export default async function PropertyDetailsPage({
   const { id } = await params;
   const { error } = await searchParams;
 
+  async function resolveOwnerOrRedirect(): Promise<string> {
+    "use server";
+    const session = await requireAgencySession();
+    const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+    if (recordOwnerId === undefined) {
+      redirect(`/policies/${id}`);
+    }
+    const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+    if (!accessibleOwnerId) {
+      redirect(`/policies/${id}`);
+    }
+    return accessibleOwnerId;
+  }
+
   async function backToPolicyAction() {
     "use server";
     const session = await requireAgencySession();
@@ -31,6 +47,7 @@ export default async function PropertyDetailsPage({
   async function saveAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
+    const ownerId = await resolveOwnerOrRedirect();
     const input: PropertyDetailsInput = {
       propertyAddress: String(formData.get("propertyAddress") ?? ""),
       constructionType: String(formData.get("constructionType") ?? ""),
@@ -38,7 +55,7 @@ export default async function PropertyDetailsPage({
       sumInsured: String(formData.get("sumInsured") ?? ""),
       perilsCovered: String(formData.get("perilsCovered") ?? ""),
     };
-    const result = await savePropertyDetails(session.user.agencyId, session.user.id, id, input);
+    const result = await savePropertyDetails(session.user.agencyId, ownerId, id, input);
     if (!result.ok) {
       redirect(`/policies/${id}/property?error=${encodeURIComponent(result.error)}`);
     }
@@ -46,7 +63,16 @@ export default async function PropertyDetailsPage({
     redirect(`/policies/${id}`);
   }
 
-  const detail = await getPropertyDetails(session.user.agencyId, session.user.id, id);
+  const recordOwnerId = await getPolicyOwnerId(session.user.agencyId, id);
+  if (recordOwnerId === undefined) {
+    notFound();
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(session.user.agencyId, session.user.id, session.user.role, recordOwnerId);
+  if (!accessibleOwnerId) {
+    notFound();
+  }
+
+  const detail = await getPropertyDetails(session.user.agencyId, accessibleOwnerId, id);
   if (detail === undefined) {
     notFound();
   }
