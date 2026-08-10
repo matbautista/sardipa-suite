@@ -156,6 +156,34 @@ export default async function PolicyDetailPage({
           </Link>
         </p>
       )}
+      {policy.line.category === "auto" && (
+        <p className="mt-2">
+          <Link href={`/policies/${policy.id}/auto`} className="text-sm text-gray-500 underline hover:text-gray-800">
+            Owner &amp; Vehicle details
+          </Link>
+        </p>
+      )}
+      {policy.line.category === "travel" && (
+        <p className="mt-2">
+          <Link href={`/policies/${policy.id}/travel`} className="text-sm text-gray-500 underline hover:text-gray-800">
+            Travel details
+          </Link>
+        </p>
+      )}
+      {policy.line.category === "property" && (
+        <p className="mt-2">
+          <Link href={`/policies/${policy.id}/property`} className="text-sm text-gray-500 underline hover:text-gray-800">
+            Property details
+          </Link>
+        </p>
+      )}
+      {policy.line.category === "health" && (
+        <p className="mt-2">
+          <Link href={`/policies/${policy.id}/health`} className="text-sm text-gray-500 underline hover:text-gray-800">
+            Health details
+          </Link>
+        </p>
+      )}
 
       {lockedByOther && lockStatus.locked && (
         <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">

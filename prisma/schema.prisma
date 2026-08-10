@@ -264,12 +264,14 @@ model Policy {
   recordLocks  RecordLock[]
   activityLogs ActivityLog[]
 
-  lifeInsured   LifeInsured?
-  lifeOwner     LifeOwner?
-  beneficiaries Beneficiary[]
-  autoOwner     AutoOwner?
-  vehicle       Vehicle?
-  travelDetail  TravelDetail?
+  lifeInsured    LifeInsured?
+  lifeOwner      LifeOwner?
+  beneficiaries  Beneficiary[]
+  autoOwner      AutoOwner?
+  vehicle        Vehicle?
+  travelDetail   TravelDetail?
+  propertyDetail PropertyDetail?
+  healthDetail   HealthDetail?
 
   @@index([agencyId, status])
   @@index([ownerId])
@@ -287,7 +289,7 @@ model Document {
   storageLocationId String
   storageLocation   StorageLocation @relation(fields: [storageLocationId], references: [id])
 
-  /// proof_of_payment | valid_id | other
+  /// proof_of_payment | valid_id | proof_of_ownership | other
   type          String
   /// relative to the storage location's own path, e.g. "{agencyId}/{policyId}/{id}.ext"
   filePath      String
@@ -458,6 +460,50 @@ model TravelDetail {
   purposeOfTravel String?
   /// medical | baggage | trip_cancellation | comprehensive
   coverageType    String
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Property/Fire and Health/HMO specific (Section 10 phase 11). Unlike Life
+// and Auto's confirmed fields, Section 11 marks these two lines' *entire*
+// field lists as "proposed — industry-typical drafts, not verified against
+// this agency's actual policy documents or forms" (Section 12's open
+// questions, still unresolved). Modeled here exactly as drafted, per
+// Section 12's own framing of these drafts as usable defaults rather than
+// build blockers — but genuinely provisional, expect a migration once the
+// agency's real forms are checked against them.
+// ─────────────────────────────────────────────────────────────────────────
+
+model PropertyDetail {
+  id       String @id @default(cuid())
+  policyId String @unique
+  policy   Policy @relation(fields: [policyId], references: [id])
+
+  propertyAddress  String
+  /// concrete | wood | mixed
+  constructionType String?
+  /// residential | commercial | industrial
+  occupancyUse     String?
+  sumInsured       Float?
+  /// free text, e.g. "fire, lightning, earthquake, flood/typhoon" — not
+  /// modeled as fixed booleans since the plan's own list ends in "etc."
+  perilsCovered    String?
+}
+
+model HealthDetail {
+  id       String @id @default(cuid())
+  policyId String @unique
+  policy   Policy @relation(fields: [policyId], references: [id])
+
+  insuredName                    String
+  insuredBirthdate               DateTime
+  existingMedicalConditions      String?
+  planCoverageTier               String?
+  /// free text, one dependent per line (name / relationship / birthdate) —
+  /// not a structured table, since the plan states no cap on dependent
+  /// count the way Beneficiaries has an explicit "up to 3/2" (Section 11)
+  dependents                     String?
+  roomBoardLimit                 Float?
+  preexistingConditionDisclosure String?
 }
 
 // ─────────────────────────────────────────────────────────────────────────

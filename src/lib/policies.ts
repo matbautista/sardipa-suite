@@ -1,5 +1,9 @@
 import { getScopedPrisma } from "@/lib/tenant-db";
 import { hasMinimumLifeInfo } from "@/lib/life-details";
+import { hasMinimumAutoInfo } from "@/lib/auto-details";
+import { hasMinimumTravelInfo } from "@/lib/travel-details";
+import { hasMinimumPropertyInfo } from "@/lib/property-details";
+import { hasMinimumHealthInfo } from "@/lib/health-details";
 
 // Policies — general (Section 10 phase 9 / Section 5's "Sales / Policies"
 // and "Recording a Renewal / Payment"). Scoped to "my own policies" for
@@ -182,15 +186,23 @@ export async function activatePolicy(agencyId: string, ownerId: string, policyId
   if (!policy.proofOfPaymentDocId) {
     return { ok: false, error: "Upload a Proof of Payment document before activating." };
   }
-  // Life's minimum-required-info gate (Section 11, phase 10). The other
-  // lines' checklists (Auto/Property/Health/Travel) arrive with phase 11 —
-  // until then, Proof of Payment is the only gate this function can
-  // enforce for those categories.
-  if (policy.line.category === "life") {
-    const hasLifeInfo = await hasMinimumLifeInfo(agencyId, policyId);
-    if (!hasLifeInfo) {
-      return { ok: false, error: "Fill in the Insured, Owner, and at least one Primary Beneficiary before activating." };
-    }
+  // Per-line minimum-required-info gates (Section 11, phases 10-11).
+  // "other" has no structured checklist in the plan, so it's gated on
+  // Proof of Payment alone, same as every category was before this phase.
+  if (policy.line.category === "life" && !(await hasMinimumLifeInfo(agencyId, policyId))) {
+    return { ok: false, error: "Fill in the Insured, Owner, and at least one Primary Beneficiary before activating." };
+  }
+  if (policy.line.category === "auto" && !(await hasMinimumAutoInfo(agencyId, policyId))) {
+    return { ok: false, error: "Fill in the Owner and Vehicle details before activating." };
+  }
+  if (policy.line.category === "travel" && !(await hasMinimumTravelInfo(agencyId, policyId))) {
+    return { ok: false, error: "Fill in the Travel details before activating." };
+  }
+  if (policy.line.category === "property" && !(await hasMinimumPropertyInfo(agencyId, policyId))) {
+    return { ok: false, error: "Fill in the Property details before activating." };
+  }
+  if (policy.line.category === "health" && !(await hasMinimumHealthInfo(agencyId, policyId))) {
+    return { ok: false, error: "Fill in the Health details before activating." };
   }
 
   await scoped.policy.update({ where: { id: policyId }, data: { status: "active" } });
