@@ -20,6 +20,12 @@ async function main() {
   // rest (Lead/Policy/User/Agency) without anything referencing them back.
   await prisma.activityLog.deleteMany({});
   await prisma.recordLock.deleteMany({});
+  // Policy and Document reference each other (Policy.proofOfPaymentDocId ->
+  // Document, Document.policyId -> Policy) — null out the pointer first to
+  // break that cycle before either can be deleted (Section 10 phase 9).
+  await prisma.policy.updateMany({ data: { proofOfPaymentDocId: null } });
+  await prisma.document.deleteMany({});
+  await prisma.policy.deleteMany({});
   await prisma.lead.deleteMany({});
   await prisma.product.deleteMany({});
   await prisma.insuranceLine.deleteMany({});

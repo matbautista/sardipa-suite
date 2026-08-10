@@ -77,9 +77,14 @@ export default async function DashboardPage() {
           )}
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-gray-700">Your leads</h2>
-            <Link href="/leads" className="text-sm text-gray-500 underline hover:text-gray-800">
-              Manage leads
-            </Link>
+            <div className="flex gap-4">
+              <Link href="/policies" className="text-sm text-gray-500 underline hover:text-gray-800">
+                My policies
+              </Link>
+              <Link href="/leads" className="text-sm text-gray-500 underline hover:text-gray-800">
+                Manage leads
+              </Link>
+            </div>
           </div>
           <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
             {leads.slice(0, 5).map((lead) => (

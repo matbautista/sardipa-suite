@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getOwnLead, updateLead, deleteLead, type LeadInput } from "@/lib/leads";
 import { listInsuranceLines } from "@/lib/insurance-lines";
 import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getPolicyForLead } from "@/lib/policies";
 
 const RECORD_TYPE = "lead";
 
@@ -85,6 +87,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   }
 
   const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
+  const existingPolicy = lead.status === "won" ? await getPolicyForLead(session.user.agencyId, session.user.id, id) : null;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
@@ -96,6 +99,28 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           </button>
         </form>
       </div>
+
+      {lead.status === "won" && (
+        <p className="mt-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+          {existingPolicy ? (
+            <>
+              Already converted to a policy —{" "}
+              <Link href={`/policies/${existingPolicy.id}`} className="underline hover:text-green-900">
+                view it
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              This lead is Won —{" "}
+              <Link href={`/policies/new?leadId=${id}`} className="underline hover:text-green-900">
+                convert it to a policy
+              </Link>
+              .
+            </>
+          )}
+        </p>
+      )}
 
       {lockedByOther && lockStatus.locked && (
         <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
