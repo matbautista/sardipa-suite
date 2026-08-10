@@ -23,4 +23,22 @@ export async function register() {
       console.error("[renewal-job] scheduled run failed:", error);
     });
   }, ONE_DAY_MS);
+
+  // Website Inquiry Intake (Section 10 phase 14 / Section 5 point 3): "the
+  // CRM host polls each configured mailbox every 5 minutes over IMAP ...
+  // a fixed interval for MVP." Same boot-plus-interval shape as the
+  // renewal job above, for the same reason — a restart shouldn't mean
+  // waiting a full cycle before the first poll happens.
+  const { pollAllMailboxes } = await import("@/lib/email-intake");
+  const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+  pollAllMailboxes().catch((error) => {
+    console.error("[email-intake] initial poll failed:", error);
+  });
+
+  setInterval(() => {
+    pollAllMailboxes().catch((error) => {
+      console.error("[email-intake] scheduled poll failed:", error);
+    });
+  }, FIVE_MINUTES_MS);
 }

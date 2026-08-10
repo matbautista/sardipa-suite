@@ -93,6 +93,9 @@ export default async function DashboardPage() {
               <Link href="/agency/users" className="text-sm text-gray-500 underline hover:text-gray-800">
                 Managers &amp; agents
               </Link>
+              <Link href="/agency/email-intake" className="text-sm text-gray-500 underline hover:text-gray-800">
+                Website inquiry intake
+              </Link>
             </div>
           )}
           {(user.role === "manager" || user.role === "head") && (
