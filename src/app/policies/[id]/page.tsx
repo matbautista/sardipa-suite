@@ -117,7 +117,7 @@ export default async function PolicyDetailPage({
 
   const [lines, documents] = await Promise.all([
     listInsuranceLines(session.user.agencyId),
-    listPolicyDocuments(session.user.agencyId, id),
+    listPolicyDocuments(session.user.agencyId, session.user.id, id),
   ]);
   const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
 

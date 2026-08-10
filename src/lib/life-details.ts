@@ -297,8 +297,11 @@ export async function deleteBeneficiary(
 // mark individual fields within those as mandatory beyond what Person/
 // Beneficiary already require (name + birthdate), so this checks that the
 // three sub-records exist, not that every optional field is filled in.
-export async function hasMinimumLifeInfo(agencyId: string, policyId: string): Promise<boolean> {
+export async function hasMinimumLifeInfo(agencyId: string, ownerId: string, policyId: string): Promise<boolean> {
   const scoped = getScopedPrisma(agencyId);
+  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId))) {
+    return false;
+  }
   const [insured, owner, primaryBeneficiaryCount] = await Promise.all([
     scoped.lifeInsured.findUnique({ where: { policyId } }),
     scoped.lifeOwner.findUnique({ where: { policyId } }),

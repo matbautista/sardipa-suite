@@ -189,19 +189,19 @@ export async function activatePolicy(agencyId: string, ownerId: string, policyId
   // Per-line minimum-required-info gates (Section 11, phases 10-11).
   // "other" has no structured checklist in the plan, so it's gated on
   // Proof of Payment alone, same as every category was before this phase.
-  if (policy.line.category === "life" && !(await hasMinimumLifeInfo(agencyId, policyId))) {
+  if (policy.line.category === "life" && !(await hasMinimumLifeInfo(agencyId, ownerId, policyId))) {
     return { ok: false, error: "Fill in the Insured, Owner, and at least one Primary Beneficiary before activating." };
   }
-  if (policy.line.category === "auto" && !(await hasMinimumAutoInfo(agencyId, policyId))) {
+  if (policy.line.category === "auto" && !(await hasMinimumAutoInfo(agencyId, ownerId, policyId))) {
     return { ok: false, error: "Fill in the Owner and Vehicle details before activating." };
   }
-  if (policy.line.category === "travel" && !(await hasMinimumTravelInfo(agencyId, policyId))) {
+  if (policy.line.category === "travel" && !(await hasMinimumTravelInfo(agencyId, ownerId, policyId))) {
     return { ok: false, error: "Fill in the Travel details before activating." };
   }
-  if (policy.line.category === "property" && !(await hasMinimumPropertyInfo(agencyId, policyId))) {
+  if (policy.line.category === "property" && !(await hasMinimumPropertyInfo(agencyId, ownerId, policyId))) {
     return { ok: false, error: "Fill in the Property details before activating." };
   }
-  if (policy.line.category === "health" && !(await hasMinimumHealthInfo(agencyId, policyId))) {
+  if (policy.line.category === "health" && !(await hasMinimumHealthInfo(agencyId, ownerId, policyId))) {
     return { ok: false, error: "Fill in the Health details before activating." };
   }
 

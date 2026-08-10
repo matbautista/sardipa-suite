@@ -49,7 +49,7 @@ export async function uploadDocument(
 
   const scoped = getScopedPrisma(agencyId);
   const policy = await scoped.policy.findUnique({ where: { id: policyId } });
-  if (!policy) {
+  if (!policy || policy.ownerId !== uploaderId) {
     return { ok: false, error: "Policy not found." };
   }
 
@@ -95,8 +95,13 @@ export async function uploadDocument(
   return { ok: true, documentId: document.id };
 }
 
-export async function listPolicyDocuments(agencyId: string, policyId: string) {
-  return getScopedPrisma(agencyId).document.findMany({
+export async function listPolicyDocuments(agencyId: string, ownerId: string, policyId: string) {
+  const scoped = getScopedPrisma(agencyId);
+  const policy = await scoped.policy.findUnique({ where: { id: policyId } });
+  if (!policy || policy.ownerId !== ownerId) {
+    return [];
+  }
+  return scoped.document.findMany({
     where: { policyId },
     orderBy: { uploadedAt: "desc" },
   });

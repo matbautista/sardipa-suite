@@ -75,8 +75,11 @@ export async function savePropertyDetails(
   return { ok: true };
 }
 
-export async function hasMinimumPropertyInfo(agencyId: string, policyId: string): Promise<boolean> {
+export async function hasMinimumPropertyInfo(agencyId: string, ownerId: string, policyId: string): Promise<boolean> {
   const scoped = getScopedPrisma(agencyId);
+  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId))) {
+    return false;
+  }
   const detail = await scoped.propertyDetail.findUnique({ where: { policyId } });
   return !!detail;
 }

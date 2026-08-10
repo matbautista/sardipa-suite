@@ -76,8 +76,11 @@ export async function saveHealthDetails(
   return { ok: true };
 }
 
-export async function hasMinimumHealthInfo(agencyId: string, policyId: string): Promise<boolean> {
+export async function hasMinimumHealthInfo(agencyId: string, ownerId: string, policyId: string): Promise<boolean> {
   const scoped = getScopedPrisma(agencyId);
+  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId))) {
+    return false;
+  }
   const detail = await scoped.healthDetail.findUnique({ where: { policyId } });
   return !!detail;
 }

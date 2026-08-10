@@ -28,7 +28,13 @@ import { isSetupComplete } from "@/lib/setup";
 //     account (mustChangePassword) is forced to /change-password before
 //     anything else, same "block everything until this one thing is
 //     done" shape as the setup gate above.
-//  4. Role gate: /admin/* is Super Admin only, /agency/* is Agency Head only.
+//  4. Role gate: /admin/* is Super Admin only, /agency/* is Agency Head
+//     only, /leads and /policies are agency-scoped users only (a Super
+//     Admin has no agencyId, so the page-level requireAgencySession() call
+//     would otherwise throw an unhandled error instead of redirecting —
+//     caught live during a full-app review, Super Admin manually visiting
+//     either route crashed instead of bouncing to /dashboard like every
+//     other unauthorized case here).
 const { auth } = NextAuth(authConfig);
 
 export const proxy = auth(async (req) => {
@@ -67,6 +73,10 @@ export const proxy = auth(async (req) => {
   }
 
   if (pathname.startsWith("/agency") && user.role !== "head") {
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  }
+
+  if ((pathname.startsWith("/leads") || pathname.startsWith("/policies")) && !user.agencyId) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 

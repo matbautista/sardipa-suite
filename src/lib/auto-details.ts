@@ -73,8 +73,11 @@ export async function saveAutoDetails(
   return { ok: true };
 }
 
-export async function hasMinimumAutoInfo(agencyId: string, policyId: string): Promise<boolean> {
+export async function hasMinimumAutoInfo(agencyId: string, ownerId: string, policyId: string): Promise<boolean> {
   const scoped = getScopedPrisma(agencyId);
+  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId))) {
+    return false;
+  }
   const [autoOwner, vehicle] = await Promise.all([
     scoped.autoOwner.findUnique({ where: { policyId } }),
     scoped.vehicle.findUnique({ where: { policyId } }),
