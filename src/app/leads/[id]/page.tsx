@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getOwnLead, getLeadOwnerId, updateLead, deleteLead, type LeadInput } from "@/lib/leads";
 import { listInsuranceLines } from "@/lib/insurance-lines";
-import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getLockStatus, checkOut, checkIn, forceRelease } from "@/lib/record-lock";
 import { getPolicyForLead } from "@/lib/policies";
 import { resolveAccessibleOwner } from "@/lib/team-access";
 
@@ -80,9 +80,33 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
-    await deleteLead(session.user.agencyId, ownerId, session.user.id, id);
+    const result = await deleteLead(session.user.agencyId, ownerId, session.user.id, id);
+    if (!result.ok) {
+      // Found in a full-app review: this previously ignored a delete
+      // failure (e.g. a race where someone else deleted it first) and
+      // redirected to /leads as if it had succeeded, with no error shown.
+      redirect(`/leads/${id}?error=${encodeURIComponent(result.error)}`);
+    }
     await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
     redirect("/leads");
+  }
+
+  // Manager/Head force-release override (Section 5) — found missing in a
+  // full-app review: phase 12 made it reachable (a Manager/Head can open a
+  // teammate's locked lead) but the override itself was never built.
+  // resolveOwnerOrRedirect() already establishes the caller may access
+  // this lead at all (Manager: own team, Head: whole agency); the role
+  // check below narrows that further to just who Section 5 grants this
+  // specific action to.
+  async function forceReleaseAction() {
+    "use server";
+    const session = await requireAgencySession();
+    if (session.user.role !== "manager" && session.user.role !== "head") {
+      redirect(`/leads/${id}?error=${encodeURIComponent("Only a Manager or Agency Head can force-release a lock.")}`);
+    }
+    await resolveOwnerOrRedirect();
+    await forceRelease(session.user.agencyId, session.user.id, RECORD_TYPE, id);
+    redirect(`/leads/${id}`);
   }
 
   // "Checked in automatically when... navigating away/closes the edit
@@ -172,10 +196,19 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       )}
 
       {lockedByOther && lockStatus.locked && (
-        <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Currently being edited by {lockStatus.holderName}, since{" "}
-          {lockStatus.lockedAt.toLocaleString()}. Read-only until they save or the lock expires.
-        </p>
+        <div className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <p>
+            Currently being edited by {lockStatus.holderName}, since{" "}
+            {lockStatus.lockedAt.toLocaleString()}. Read-only until they save or the lock expires.
+          </p>
+          {(session.user.role === "manager" || session.user.role === "head") && (
+            <form action={forceReleaseAction} className="mt-2">
+              <button type="submit" className="text-xs font-medium text-amber-900 underline hover:text-amber-950">
+                Force-release lock
+              </button>
+            </form>
+          )}
+        </div>
       )}
 
       <form

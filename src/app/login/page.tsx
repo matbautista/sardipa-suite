@@ -39,7 +39,12 @@ export default async function LoginPage({
             Password changed — sign in with your new password.
           </p>
         )}
-        {error && (
+        {error === "deactivated" && (
+          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            Your account has been deactivated. Contact your Agency Head or Super Admin.
+          </p>
+        )}
+        {error && error !== "deactivated" && (
           <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             Incorrect email or password, or this account is locked/inactive.
           </p>

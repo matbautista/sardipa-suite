@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
 import { getScopedPrisma } from "@/lib/tenant-db";
 import { generateTemporaryPassword } from "@/lib/password-policy";
 
@@ -43,8 +44,12 @@ async function createAgencyUser(
   // Email uniqueness is global (Section 6: User.email @unique), not just
   // within this agency, so this has to check the whole table — but
   // everything else about this user is still created through the scoped
-  // client below.
-  const existingEmail = await scoped.user.findUnique({ where: { email: normalizedEmail } });
+  // client below. Must use the raw `prisma` client, not `scoped`: found in
+  // a full-app review that getScopedPrisma's findUnique guard treats any
+  // cross-tenant match as "not found" (tenant-db.ts), so this check was
+  // silently never detecting a collision with another agency's user —
+  // agency-admin.ts's equivalent check already does this correctly.
+  const existingEmail = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existingEmail) {
     return { ok: false, error: "That email is already in use." };
   }

@@ -45,6 +45,7 @@ export const ACTIVITY_ACTION_LABELS: Record<string, string> = {
   policy_activated: "Policy activated",
   policy_renewed: "Policy renewed",
   document_uploaded: "Document uploaded",
+  lock_force_released: "Record lock force-released",
   manager_account_created: "Manager account created",
   agent_account_created: "Agent account created",
   password_reset_by_head: "Password reset (by Agency Head)",

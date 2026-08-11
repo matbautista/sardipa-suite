@@ -11,7 +11,7 @@ import {
 } from "@/lib/policies";
 import { uploadDocument, listPolicyDocuments } from "@/lib/documents";
 import { listInsuranceLines } from "@/lib/insurance-lines";
-import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getLockStatus, checkOut, checkIn, forceRelease } from "@/lib/record-lock";
 import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "policy";
@@ -133,6 +133,22 @@ export default async function PolicyDetailPage({
     redirect(`/policies/${id}`);
   }
 
+  // Manager/Head force-release override (Section 5) — same fix and
+  // reasoning as leads/[id]/page.tsx's forceReleaseAction, found missing
+  // in a full-app review. Releases the one shared policy-level lock this
+  // page and all five detail sub-pages (/life, /auto, /travel, /property,
+  // /health) key off, so releasing here clears it everywhere.
+  async function forceReleaseAction() {
+    "use server";
+    const session = await requireAgencySession();
+    if (session.user.role !== "manager" && session.user.role !== "head") {
+      redirect(`/policies/${id}?error=${encodeURIComponent("Only a Manager or Agency Head can force-release a lock.")}`);
+    }
+    await resolveOwnerOrRedirect();
+    await forceRelease(session.user.agencyId, session.user.id, RECORD_TYPE, id);
+    redirect(`/policies/${id}`);
+  }
+
   async function backToPoliciesAction() {
     "use server";
     const session = await requireAgencySession();
@@ -236,10 +252,19 @@ export default async function PolicyDetailPage({
       )}
 
       {lockedByOther && lockStatus.locked && (
-        <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Currently being edited by {lockStatus.holderName}, since {lockStatus.lockedAt.toLocaleString()}.
-          Read-only until they save or the lock expires.
-        </p>
+        <div className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <p>
+            Currently being edited by {lockStatus.holderName}, since {lockStatus.lockedAt.toLocaleString()}.
+            Read-only until they save or the lock expires.
+          </p>
+          {(session.user.role === "manager" || session.user.role === "head") && (
+            <form action={forceReleaseAction} className="mt-2">
+              <button type="submit" className="text-xs font-medium text-amber-900 underline hover:text-amber-950">
+                Force-release lock
+              </button>
+            </form>
+          )}
+        </div>
       )}
 
       {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

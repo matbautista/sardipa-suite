@@ -146,13 +146,20 @@ function parseStructuredInquiry(subject: string, bodyText: string): ParsedInquir
 
 async function createLeadFromInquiry(agencyId: string, subject: string, bodyText: string): Promise<void> {
   const parsed = parseStructuredInquiry(subject, bodyText);
+  // Routed through the tenant-scoping layer, not the plain `prisma`
+  // client, for both Lead.create calls below — found in a full-app review
+  // as the one Lead-creating call site in src/lib that bypassed it.
+  // Harmless today (agencyId is always set explicitly), but it defeats
+  // tenant-db.ts's "centralized in one data-access layer so it can't be
+  // forgotten" guarantee for any future edit to this function.
+  const scoped = getScopedPrisma(agencyId);
 
   if (!parsed.matchedFormat) {
     // Point 5: still create a Lead rather than dropping it — flagged for
     // review, raw body kept as the only record of what came in. Lead.name
     // is required (schema), and there's no name to use, so the subject
     // line (or a fallback) stands in.
-    await prisma.lead.create({
+    await scoped.lead.create({
       data: {
         agencyId,
         ownerId: null,
@@ -171,7 +178,7 @@ async function createLeadFromInquiry(agencyId: string, subject: string, bodyText
     // fetched and compared in JS rather than a DB-level case-insensitive
     // filter, since SQLite string equality is case-sensitive by default
     // and Prisma's `mode: "insensitive"` isn't supported on this provider.
-    const lines = await getScopedPrisma(agencyId).insuranceLine.findMany();
+    const lines = await scoped.insuranceLine.findMany();
     const matchedLine = lines.find((line) => line.name.trim().toLowerCase() === parsed.lineName!.trim().toLowerCase());
     lineId = matchedLine?.id ?? null;
   }
@@ -181,7 +188,7 @@ async function createLeadFromInquiry(agencyId: string, subject: string, bodyText
   // treatment as an unparseable email (point 7).
   const needsReview = lineId === null;
 
-  await prisma.lead.create({
+  await scoped.lead.create({
     data: {
       agencyId,
       ownerId: null,

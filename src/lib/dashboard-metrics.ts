@@ -140,8 +140,12 @@ export async function getTeamDashboardMetrics(
   const scoped = getScopedPrisma(agencyId);
   // An explicit agent filter narrows the whole dashboard to just that
   // person — the leaderboard rows for everyone else then correctly show
-  // zero, since their leads/policies were never fetched.
-  const effectiveOwnerIds = filters.ownerId ? [filters.ownerId] : ownerIds;
+  // zero, since their leads/policies were never fetched. filters.ownerId
+  // is untrusted (a query-string param) — only honored when it's actually
+  // within the caller's own team scope, same IDOR fix as listTeamLeads/
+  // listTeamPolicies; otherwise it silently falls back to the full team
+  // rather than leaking another team's revenue/metrics.
+  const effectiveOwnerIds = filters.ownerId && ownerIds.includes(filters.ownerId) ? [filters.ownerId] : ownerIds;
   const dateRange = buildDateRange(filters.startDate, filters.endDate);
 
   const leads = await scoped.lead.findMany({

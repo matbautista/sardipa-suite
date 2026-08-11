@@ -197,11 +197,20 @@ export type TeamLeadFilters = { status?: string; ownerId?: string };
 // Manager/Head cross-visibility list (Section 10 phase 12). `ownerIds` is
 // already resolved by the caller via getTeamMemberIds() — this function
 // doesn't itself decide who's in scope, just lists leads within a given set.
+//
+// filters.ownerId comes straight from a query-string param on /team/leads,
+// so it's untrusted: it's only honored when it's actually a member of
+// ownerIds (intersected, not substituted). A crafted id outside the
+// caller's team silently falls back to the full team scope rather than
+// leaking another team's records — found and fixed after a full-app
+// review flagged this as an IDOR (a Manager could otherwise pass another
+// team's agent id and see their leads).
 export async function listTeamLeads(agencyId: string, ownerIds: string[], filters: TeamLeadFilters = {}) {
   const scoped = getScopedPrisma(agencyId);
+  const ownerFilter = filters.ownerId && ownerIds.includes(filters.ownerId) ? filters.ownerId : { in: ownerIds };
   return scoped.lead.findMany({
     where: {
-      ownerId: filters.ownerId ? filters.ownerId : { in: ownerIds },
+      ownerId: ownerFilter,
       ...(filters.status ? { status: filters.status } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -244,9 +253,18 @@ export async function claimLead(agencyId: string, callerId: string, leadId: stri
 // function trusts that was checked by the caller (the page/action calling
 // it builds its <select> options from that exact same list), same
 // "resolve once, trust downstream" shape as resolveAccessibleOwner().
+//
+// `callerOwnerIds` (the same getTeamMemberIds() result the caller already
+// computed to validate newOwnerId) is also used to verify the lead's
+// *current* owner is within the caller's scope — found missing in a
+// full-app review: without it, a Manager could pass a leadId belonging to
+// another team's agent (with a newOwnerId validated only against their
+// own team) and reassign it into their own team, an IDOR the "trust the
+// caller validated newOwnerId" comment above never covered for ownerId.
 export async function reassignLead(
   agencyId: string,
   actorId: string,
+  callerOwnerIds: string[],
   leadId: string,
   newOwnerId: string
 ): Promise<ActionResult> {
@@ -254,6 +272,9 @@ export async function reassignLead(
   const lead = await scoped.lead.findUnique({ where: { id: leadId } });
   if (!lead) {
     return { ok: false, error: "Lead not found." };
+  }
+  if (!lead.ownerId || !callerOwnerIds.includes(lead.ownerId)) {
+    return { ok: false, error: "That lead isn't in your team." };
   }
   await scoped.lead.update({ where: { id: leadId }, data: { ownerId: newOwnerId } });
   await scoped.activityLog.create({

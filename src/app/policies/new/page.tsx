@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
-import { getOwnLead } from "@/lib/leads";
+import { getOwnLead, getLeadOwnerId } from "@/lib/leads";
 import { convertLeadToPolicy } from "@/lib/policies";
 import { listInsuranceLines } from "@/lib/insurance-lines";
+import { resolveAccessibleOwner } from "@/lib/team-access";
 
 export default async function NewPolicyPage({
   searchParams,
@@ -17,7 +18,27 @@ export default async function NewPolicyPage({
     notFound();
   }
 
-  const lead = await getOwnLead(session.user.agencyId, session.user.id, leadId);
+  // Resolves "which owner's lead may this caller touch" the same way
+  // leads/[id]/page.tsx and policies/[id]/page.tsx already do — found
+  // missing here in a full-app review: this page previously always used
+  // the caller's own id, so a Manager/Head converting a subordinate's Won
+  // lead (a link leads/[id]/page.tsx already shows them) 404'd instead of
+  // working.
+  const recordOwnerId = await getLeadOwnerId(session.user.agencyId, leadId);
+  if (recordOwnerId === undefined || recordOwnerId === null) {
+    notFound();
+  }
+  const accessibleOwnerId = await resolveAccessibleOwner(
+    session.user.agencyId,
+    session.user.id,
+    session.user.role,
+    recordOwnerId
+  );
+  if (!accessibleOwnerId) {
+    notFound();
+  }
+
+  const lead = await getOwnLead(session.user.agencyId, accessibleOwnerId, leadId);
   if (!lead) {
     notFound();
   }
@@ -28,7 +49,17 @@ export default async function NewPolicyPage({
   async function convertLeadToPolicyAction(formData: FormData) {
     "use server";
     const session = await requireAgencySession();
-    const result = await convertLeadToPolicy(session.user.agencyId, session.user.id, leadId!, {
+    const recordOwnerId = await getLeadOwnerId(session.user.agencyId, leadId!);
+    const accessibleOwnerId = await resolveAccessibleOwner(
+      session.user.agencyId,
+      session.user.id,
+      session.user.role,
+      recordOwnerId ?? null
+    );
+    if (!accessibleOwnerId) {
+      redirect("/leads");
+    }
+    const result = await convertLeadToPolicy(session.user.agencyId, accessibleOwnerId, session.user.id, leadId!, {
       lineId: String(formData.get("lineId") ?? ""),
       productId: String(formData.get("productId") ?? ""),
       premium: String(formData.get("premium") ?? ""),

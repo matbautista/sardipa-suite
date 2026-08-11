@@ -47,7 +47,10 @@ async function reassignLeadAction(formData: FormData) {
     redirect(`/team/leads?error=${encodeURIComponent("Choose a valid team member to reassign to.")}`);
   }
 
-  await reassignLead(session.user.agencyId, session.user.id, leadId, newOwnerId);
+  const result = await reassignLead(session.user.agencyId, session.user.id, teamMemberIds, leadId, newOwnerId);
+  if (!result.ok) {
+    redirect(`/team/leads?error=${encodeURIComponent(result.error)}`);
+  }
   redirect("/team/leads");
 }
 

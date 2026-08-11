@@ -2,6 +2,16 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
 import { isSetupComplete } from "@/lib/setup";
+import { isUserActive } from "@/lib/login";
+
+// NextAuth v5's default session cookie name (verified against
+// node_modules/@auth/core/lib/utils/cookie.js) — "authjs.session-token"
+// normally, "__Secure-" prefixed only when useSecureCookies is on (HTTPS).
+// This app runs plain HTTP by default (Section 8), but both are cleared
+// below so a later move behind a reverse-proxy/TLS (Section 8's "Future
+// path") doesn't quietly bring this check's cookie-clearing back to
+// half-working.
+const SESSION_COOKIE_NAMES = ["authjs.session-token", "__Secure-authjs.session-token"];
 
 // Named "proxy", not "middleware" — Next.js 16 renamed the convention (the
 // old middleware.ts export is deprecated and silently ignored at build
@@ -24,6 +34,15 @@ import { isSetupComplete } from "@/lib/setup";
 //  2. Auth gate: redirect to /login unless signed in (preserving the
 //     original URL as callbackUrl), and bounce an already-signed-in user
 //     away from /login instead of looping.
+//  2b. Deactivation gate: a User.isActive flip previously had no effect
+//     on an already-issued JWT session (found in a full-app review — the
+//     session carries no live link back to the User row, so a deactivated
+//     user's login just kept working for the rest of the session's
+//     lifetime). Checked on every authenticated request, before the
+//     isLoginPage bounce-away above would otherwise send a
+//     still-cookied-but-deactivated user straight back to /dashboard —
+//     the session cookie is explicitly cleared here too, not just
+//     redirected past, so this doesn't loop.
 //  3. Change-password gate (Section 5/10 phase 5): a temporary-password
 //     account (mustChangePassword) is forced to /change-password before
 //     anything else, same "block everything until this one thing is
@@ -55,6 +74,14 @@ export const proxy = auth(async (req) => {
 
   const isLoggedIn = !!req.auth?.user;
   const isLoginPage = pathname === "/login";
+
+  if (isLoggedIn && !(await isUserActive(req.auth!.user.id))) {
+    const response = NextResponse.redirect(new URL("/login?error=deactivated", req.nextUrl));
+    for (const name of SESSION_COOKIE_NAMES) {
+      response.cookies.delete(name);
+    }
+    return response;
+  }
 
   if (isLoginPage) {
     return isLoggedIn ? NextResponse.redirect(new URL("/dashboard", req.nextUrl)) : NextResponse.next();

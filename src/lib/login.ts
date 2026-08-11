@@ -91,3 +91,18 @@ function logAttempt(userId: string, agencyId: string | null, action: string, not
     data: { userId, agencyId, action, note },
   });
 }
+
+// isActive was previously only ever checked at login (above) — the JWT
+// session carries no live link back to the User row, so a deactivated
+// user's already-issued session kept working for the rest of its
+// lifetime (default 30 days) regardless. Found in a full-app review;
+// src/proxy.ts now calls this on every authenticated request to close
+// that gap. A plain indexed primary-key lookup — cheap enough for this
+// app's small-office-LAN scale (same tolerance the polling model in
+// Section 5 already assumes) — and deliberately never cached, unlike
+// isSetupComplete()'s one-way true flip, since isActive can flip back
+// and forth at any time.
+export async function isUserActive(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { isActive: true } });
+  return user?.isActive ?? false;
+}

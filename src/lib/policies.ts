@@ -95,9 +95,20 @@ function parsePolicyInput(scoped: ReturnType<typeof getScopedPrisma>, input: Pol
   })();
 }
 
+// ownerId: whose lead/policy this is — may be resolved to someone other
+// than the caller by team-access.ts (a Manager/Head converting a
+// subordinate's Won lead). actorId: who's actually clicking the button,
+// always the real caller, for ActivityLog attribution. Found via a
+// full-app review that this file's header comment ("creation is
+// lead-conversion only for now") had drifted into an unstated "and always
+// self-service" assumption that policies/new/page.tsx's own code baked
+// in — but leads/[id]/page.tsx already links Manager/Head to convert a
+// subordinate's Won lead, so that assumption was simply wrong, not a
+// deliberate scope decision.
 export async function convertLeadToPolicy(
   agencyId: string,
   ownerId: string,
+  actorId: string,
   leadId: string,
   input: PolicyFormInput
 ): Promise<{ ok: true; policyId: string } | { ok: false; error: string }> {
@@ -133,10 +144,8 @@ export async function convertLeadToPolicy(
       renewalDate: parsed.renewalDate,
     },
   });
-  // Self-service only for now (this file's header comment) — ownerId
-  // doubles as the actor, same reasoning as leads.ts's createLead.
   await scoped.activityLog.create({
-    data: { userId: ownerId, policyId: policy.id, action: "policy_created", note: null },
+    data: { userId: actorId, policyId: policy.id, action: "policy_created", note: null },
   });
 
   return { ok: true, policyId: policy.id };
@@ -282,11 +291,15 @@ export type TeamPolicyFilters = { status?: string; ownerId?: string };
 // Manager/Head cross-visibility list (Section 10 phase 12) — same shape as
 // leads.ts's listTeamLeads: `ownerIds` is resolved by the caller via
 // getTeamMemberIds() first.
+//
+// filters.ownerId is untrusted (a query-string param) — intersected with
+// ownerIds, never substituted for it, same IDOR fix as listTeamLeads.
 export async function listTeamPolicies(agencyId: string, ownerIds: string[], filters: TeamPolicyFilters = {}) {
   const scoped = getScopedPrisma(agencyId);
+  const ownerFilter = filters.ownerId && ownerIds.includes(filters.ownerId) ? filters.ownerId : { in: ownerIds };
   return scoped.policy.findMany({
     where: {
-      ownerId: filters.ownerId ? filters.ownerId : { in: ownerIds },
+      ownerId: ownerFilter,
       ...(filters.status ? { status: filters.status } : {}),
     },
     orderBy: { startDate: "desc" },

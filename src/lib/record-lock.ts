@@ -7,10 +7,11 @@ import { getScopedPrisma } from "@/lib/tenant-db";
 // even reach its edit page (phase 7's ownership scoping), so there's no
 // uninvolved viewer to spare from taking a lock. That distinction becomes
 // meaningful once Manager/Head can open a teammate's record without
-// editing it (phase 12) — the Manager/Head force-release override from
-// Section 5 is deliberately not built here yet for the same reason: there
-// is no page where a Manager/Head can reach another agent's lock to
-// force-release it until that phase lands.
+// editing it (phase 12) — which is exactly what forceRelease() below is
+// for. It was originally deferred with the reasoning "there's no page
+// where a Manager/Head can reach another agent's lock yet," but phase 12
+// shipped that reachability and this function was never actually added —
+// caught in a full-app review as a stale deferral, not a still-current one.
 
 const LOCK_TIMEOUT_MINUTES = 15;
 
@@ -78,4 +79,32 @@ export async function checkOut(agencyId: string, callerId: string, recordType: s
 export async function checkIn(agencyId: string, callerId: string, recordType: string, recordId: string): Promise<void> {
   const scoped = getScopedPrisma(agencyId);
   await scoped.recordLock.deleteMany({ where: { recordType, recordId, lockedBy: callerId } });
+}
+
+// Manager/Head force-release override (Section 5: "a Manager can
+// force-release a stuck lock on their own team's records; Agency Head can
+// do it for any record in the agency — in case the timeout hasn't hit yet
+// and someone genuinely needs in"). Unlike checkIn, this releases
+// regardless of who holds it — deliberately no `lockedBy` filter. Trusts
+// the caller already verified the record itself is within the actor's
+// team scope (same "resolve once, trust downstream" shape as everywhere
+// else — the page calling this already had to resolve that to render the
+// record at all), so it takes no role/ownership arguments of its own.
+export async function forceRelease(
+  agencyId: string,
+  actorId: string,
+  recordType: string,
+  recordId: string
+): Promise<void> {
+  const scoped = getScopedPrisma(agencyId);
+  await scoped.recordLock.deleteMany({ where: { recordType, recordId } });
+  await scoped.activityLog.create({
+    data: {
+      userId: actorId,
+      leadId: recordType === "lead" ? recordId : null,
+      policyId: recordType === "policy" ? recordId : null,
+      action: "lock_force_released",
+      note: null,
+    },
+  });
 }
