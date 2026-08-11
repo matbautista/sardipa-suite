@@ -41,4 +41,21 @@ export async function register() {
       console.error("[email-intake] scheduled poll failed:", error);
     });
   }, FIVE_MINUTES_MS);
+
+  // Proactive disk-space/reachability monitoring (Section 10 phase 15 /
+  // Section 9's Self-Healing: "checked periodically ... rather than only
+  // discovered on write failure"). Same boot-plus-interval shape as the
+  // jobs above.
+  const { checkAllStorageLocations } = await import("@/lib/storage-health");
+  const STORAGE_CHECK_INTERVAL_MS = Number(process.env.STORAGE_HEALTH_CHECK_INTERVAL_MS ?? FIVE_MINUTES_MS);
+
+  checkAllStorageLocations().catch((error) => {
+    console.error("[storage-health] initial check failed:", error);
+  });
+
+  setInterval(() => {
+    checkAllStorageLocations().catch((error) => {
+      console.error("[storage-health] scheduled check failed:", error);
+    });
+  }, STORAGE_CHECK_INTERVAL_MS);
 }

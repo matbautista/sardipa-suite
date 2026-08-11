@@ -43,9 +43,10 @@ async function main() {
   await prisma.lead.deleteMany({});
   await prisma.product.deleteMany({});
   await prisma.insuranceLine.deleteMany({});
-  // Neither of these has real data yet (phases 14/15, not built) — cleared
-  // now anyway so a future seed run doesn't hit the exact FK-violation bug
-  // that phases 9, 10, and 11 each hit in turn for a different table.
+  // Cleared on every reseed so a fresh run never trips the exact
+  // FK-violation bug that phases 9, 10, and 11 each hit in turn for a
+  // different table — same reasoning as the deletes above, now that
+  // phases 14/15 actually populate these two tables.
   await prisma.systemAlert.deleteMany({});
   await prisma.emailIntakeConfig.deleteMany({});
   await prisma.user.deleteMany({ where: { role: { not: "super_admin" } } });

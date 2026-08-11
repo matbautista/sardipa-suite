@@ -68,9 +68,14 @@ export default async function DashboardPage() {
         <div className="mt-8">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-gray-700">Agencies on this installation</h2>
-            <Link href="/admin/agencies" className="text-sm text-gray-500 underline hover:text-gray-800">
-              Manage agencies
-            </Link>
+            <div className="flex gap-4">
+              <Link href="/admin/health" className="text-sm text-gray-500 underline hover:text-gray-800">
+                System health
+              </Link>
+              <Link href="/admin/agencies" className="text-sm text-gray-500 underline hover:text-gray-800">
+                Manage agencies
+              </Link>
+            </div>
           </div>
           <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
             {agencies.map((agency) => (

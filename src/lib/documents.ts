@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getScopedPrisma } from "@/lib/tenant-db";
 import { ensureWritableDirectory } from "@/lib/storage-path";
 import { resolveAccessibleOwner } from "@/lib/team-access";
+import { classifyFsError, raiseStorageAlert } from "@/lib/storage-health";
 
 // Document upload/storage (Section 10 phase 9 / Section 5's "How Documents
 // Are Saved" and "Upload Limits & Image Sizing"). Client-side image
@@ -73,11 +74,46 @@ export async function uploadDocument(
   // known before the row exists.
   const documentId = randomUUID();
   const relativePath = `${agencyId}/${policyId}/${documentId}.${ext}`;
-  const absoluteDir = path.join(location.path, agencyId, policyId);
-  ensureWritableDirectory(absoluteDir);
+  const absolutePath = path.join(location.path, relativePath);
+  // Written to a temp name first and only renamed on confirmed success
+  // (Section 9's Self-Healing: "failed uploads clean up after themselves")
+  // — a failed or interrupted write never leaves a corrupt/partial file
+  // under the real name.
+  const tempPath = `${absolutePath}.uploading-${documentId}`;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(path.join(location.path, relativePath), buffer);
+  try {
+    const absoluteDir = path.join(location.path, agencyId, policyId);
+    ensureWritableDirectory(absoluteDir);
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await fs.writeFile(tempPath, buffer);
+    await fs.rename(tempPath, absolutePath);
+  } catch (error) {
+    await fs.unlink(tempPath).catch(() => {});
+
+    const kind = classifyFsError(error);
+    if (kind === "full") {
+      await raiseStorageAlert(
+        location,
+        "storage_full",
+        `Storage location "${location.label}" rejected a write — the drive is full. Add a new storage location (Section 5).`
+      );
+      return { ok: false, error: "Can't save this file — the storage drive is full. An admin needs to add a new storage location." };
+    }
+    if (kind === "unreachable") {
+      await raiseStorageAlert(
+        location,
+        "storage_unreachable",
+        `Storage location "${location.label}" is unreachable — the drive may be disconnected (${error instanceof Error ? error.message : "unknown error"}).`
+      );
+      return {
+        ok: false,
+        error: `Can't save this file — "${location.label}" is temporarily unavailable. The drive may be disconnected; try again in a moment or contact your Super Admin.`,
+      };
+    }
+    console.error("[documents] upload write failed:", error);
+    return { ok: false, error: "Upload didn't complete — please try again." };
+  }
 
   const document = await scoped.document.create({
     data: {
@@ -113,7 +149,7 @@ export async function listPolicyDocuments(agencyId: string, ownerId: string, pol
   });
 }
 
-type DownloadableDocument = { absolutePath: string; fileName: string; contentType: string };
+type DownloadableDocument = { absolutePath: string; fileName: string; contentType: string; locationLabel: string };
 
 // This route can't resolve "which owner's records may the caller touch"
 // up front the way a policy detail page can — a document download only
@@ -146,5 +182,6 @@ export async function getDocumentForDownload(
     absolutePath: path.join(document.storageLocation.path, document.filePath),
     fileName: path.basename(document.filePath),
     contentType,
+    locationLabel: document.storageLocation.label,
   };
 }
