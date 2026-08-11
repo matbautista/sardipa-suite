@@ -23,9 +23,14 @@ export default async function PoliciesPage() {
     <div className="mx-auto max-w-2xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">My Policies</h1>
-        <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
-          Back to dashboard
-        </Link>
+        <div className="flex gap-4">
+          <a href="/api/export/policies" className="text-sm text-gray-500 underline hover:text-gray-800">
+            Export CSV
+          </a>
+          <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
+            Back to dashboard
+          </Link>
+        </div>
       </div>
 
       <ul className="mt-8 divide-y divide-gray-200 rounded-md border border-gray-200">

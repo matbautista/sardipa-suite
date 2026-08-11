@@ -133,6 +133,11 @@ export async function convertLeadToPolicy(
       renewalDate: parsed.renewalDate,
     },
   });
+  // Self-service only for now (this file's header comment) — ownerId
+  // doubles as the actor, same reasoning as leads.ts's createLead.
+  await scoped.activityLog.create({
+    data: { userId: ownerId, policyId: policy.id, action: "policy_created", note: null },
+  });
 
   return { ok: true, policyId: policy.id };
 }
@@ -140,6 +145,7 @@ export async function convertLeadToPolicy(
 export async function updateDraftPolicy(
   agencyId: string,
   ownerId: string,
+  actorId: string,
   policyId: string,
   input: PolicyFormInput
 ): Promise<ActionResult> {
@@ -170,6 +176,7 @@ export async function updateDraftPolicy(
       renewalDate: parsed.renewalDate,
     },
   });
+  await scoped.activityLog.create({ data: { userId: actorId, policyId, action: "policy_updated", note: null } });
 
   return { ok: true };
 }

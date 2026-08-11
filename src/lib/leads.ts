@@ -89,7 +89,7 @@ export async function createLead(agencyId: string, ownerId: string, input: LeadI
     return resolved;
   }
 
-  await scoped.lead.create({
+  const lead = await scoped.lead.create({
     // agencyId redundant at runtime (getScopedPrisma always overwrites
     // it), included only to satisfy Prisma's generated CreateInput type.
     data: {
@@ -106,6 +106,10 @@ export async function createLead(agencyId: string, ownerId: string, input: LeadI
       nextFollowUpDate: input.nextFollowUpDate ? new Date(input.nextFollowUpDate) : null,
     },
   });
+  // createLead is always self-service (ownerId is always the caller's own
+  // id here — see this file's header comment), so ownerId doubles as the
+  // actor.
+  await scoped.activityLog.create({ data: { userId: ownerId, leadId: lead.id, action: "lead_created", note: null } });
 
   return { ok: true };
 }
@@ -113,6 +117,7 @@ export async function createLead(agencyId: string, ownerId: string, input: LeadI
 export async function updateLead(
   agencyId: string,
   ownerId: string,
+  actorId: string,
   leadId: string,
   input: LeadInput
 ): Promise<ActionResult> {
@@ -149,17 +154,30 @@ export async function updateLead(
       nextFollowUpDate: input.nextFollowUpDate ? new Date(input.nextFollowUpDate) : null,
     },
   });
+  await scoped.activityLog.create({ data: { userId: actorId, leadId, action: "lead_updated", note: null } });
 
   return { ok: true };
 }
 
-export async function deleteLead(agencyId: string, ownerId: string, leadId: string): Promise<ActionResult> {
+export async function deleteLead(
+  agencyId: string,
+  ownerId: string,
+  actorId: string,
+  leadId: string
+): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
   const existing = await scoped.lead.findUnique({ where: { id: leadId } });
   if (!existing || existing.ownerId !== ownerId) {
     return { ok: false, error: "Lead not found." };
   }
 
+  // Logged before the delete, not after — ActivityLog.leadId has no
+  // ON DELETE CASCADE-safe way to reference a row that no longer exists,
+  // and Section 5 requires the delete itself to be audited, not just
+  // creates/updates.
+  await scoped.activityLog.create({
+    data: { userId: actorId, leadId, action: "lead_deleted", note: `"${existing.name}" deleted` },
+  });
   await scoped.lead.delete({ where: { id: leadId } });
   return { ok: true };
 }
@@ -216,6 +234,7 @@ export async function claimLead(agencyId: string, callerId: string, leadId: stri
     return { ok: false, error: "This lead is already assigned to someone." };
   }
   await scoped.lead.update({ where: { id: leadId }, data: { ownerId: callerId } });
+  await scoped.activityLog.create({ data: { userId: callerId, leadId, action: "lead_claimed", note: null } });
   return { ok: true };
 }
 
@@ -225,12 +244,20 @@ export async function claimLead(agencyId: string, callerId: string, leadId: stri
 // function trusts that was checked by the caller (the page/action calling
 // it builds its <select> options from that exact same list), same
 // "resolve once, trust downstream" shape as resolveAccessibleOwner().
-export async function reassignLead(agencyId: string, leadId: string, newOwnerId: string): Promise<ActionResult> {
+export async function reassignLead(
+  agencyId: string,
+  actorId: string,
+  leadId: string,
+  newOwnerId: string
+): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
   const lead = await scoped.lead.findUnique({ where: { id: leadId } });
   if (!lead) {
     return { ok: false, error: "Lead not found." };
   }
   await scoped.lead.update({ where: { id: leadId }, data: { ownerId: newOwnerId } });
+  await scoped.activityLog.create({
+    data: { userId: actorId, leadId, action: "lead_reassigned", note: `Reassigned to a different agent` },
+  });
   return { ok: true };
 }

@@ -85,7 +85,7 @@ export default async function PolicyDetailPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
-    const result = await updateDraftPolicy(session.user.agencyId, ownerId, id, readPolicyInput(formData));
+    const result = await updateDraftPolicy(session.user.agencyId, ownerId, session.user.id, id, readPolicyInput(formData));
     if (!result.ok) {
       redirect(`/policies/${id}?error=${encodeURIComponent(result.error)}`);
     }

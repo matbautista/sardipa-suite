@@ -134,6 +134,10 @@ export async function uploadDocument(
     await scoped.policy.update({ where: { id: policyId }, data: { proofOfPaymentDocId: document.id } });
   }
 
+  await scoped.activityLog.create({
+    data: { userId: actorId, policyId, action: "document_uploaded", note: `${docType} uploaded` },
+  });
+
   return { ok: true, documentId: document.id };
 }
 

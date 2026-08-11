@@ -53,6 +53,18 @@ export async function getMyDashboardMetrics(agencyId: string, ownerId: string) {
     premium: activationsThisMonth.reduce((sum, a) => sum + (a.policy?.premium ?? 0), 0),
   };
 
+  const followUps = await getMyFollowUps(agencyId, ownerId);
+
+  return { pipeline, conversionRate, salesThisMonth, followUps };
+}
+
+// Extracted so /reminders (Section 10 phase 16 / Section 5's "Follow-up
+// reminders list") can show the *full* list — the dashboard above only
+// ever shows the top 5.
+export async function getMyFollowUps(agencyId: string, ownerId: string): Promise<FollowUpItem[]> {
+  const scoped = getScopedPrisma(agencyId);
+  const now = new Date();
+
   const [dueLeads, gracePolicies] = await Promise.all([
     scoped.lead.findMany({
       where: { ownerId, nextFollowUpDate: { not: null }, status: { notIn: ["won", "lost"] } },
@@ -66,7 +78,7 @@ export async function getMyDashboardMetrics(agencyId: string, ownerId: string) {
     }),
   ]);
 
-  const followUps: FollowUpItem[] = [
+  return [
     ...dueLeads.map((l) => ({
       type: "lead" as const,
       id: l.id,
@@ -86,8 +98,6 @@ export async function getMyDashboardMetrics(agencyId: string, ownerId: string) {
         overdue: p.gracePeriodEndsAt! < now,
       })),
   ].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-
-  return { pipeline, conversionRate, salesThisMonth, followUps };
 }
 
 export type TeamDashboardFilters = {

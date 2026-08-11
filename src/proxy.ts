@@ -29,14 +29,15 @@ import { isSetupComplete } from "@/lib/setup";
 //     anything else, same "block everything until this one thing is
 //     done" shape as the setup gate above.
 //  4. Role gate: /admin/* is Super Admin only, /agency/* is Agency Head
-//     only, /leads and /policies are agency-scoped users only (a Super
-//     Admin has no agencyId, so the page-level requireAgencySession() call
-//     would otherwise throw an unhandled error instead of redirecting —
-//     caught live during a full-app review, Super Admin manually visiting
-//     either route crashed instead of bouncing to /dashboard like every
-//     other unauthorized case here). /team/* is Manager and Head only
-//     (Section 10 phase 12) — unlike /leads and /policies, an Agent has no
-//     business here at all, not just a missing agencyId.
+//     only, /leads, /policies, /reminders, and /search are agency-scoped
+//     users only (a Super Admin has no agencyId, so the page-level
+//     requireAgencySession() call would otherwise throw an unhandled error
+//     instead of redirecting — caught live during a full-app review, Super
+//     Admin manually visiting one of these routes crashed instead of
+//     bouncing to /dashboard like every other unauthorized case here).
+//     /team/* is Manager and Head only (Section 10 phase 12) — unlike the
+//     routes above, an Agent has no business here at all, not just a
+//     missing agencyId.
 const { auth } = NextAuth(authConfig);
 
 export const proxy = auth(async (req) => {
@@ -78,7 +79,13 @@ export const proxy = auth(async (req) => {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 
-  if ((pathname.startsWith("/leads") || pathname.startsWith("/policies")) && !user.agencyId) {
+  if (
+    (pathname.startsWith("/leads") ||
+      pathname.startsWith("/policies") ||
+      pathname.startsWith("/reminders") ||
+      pathname.startsWith("/search")) &&
+    !user.agencyId
+  ) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 

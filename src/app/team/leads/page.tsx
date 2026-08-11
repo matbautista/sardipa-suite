@@ -47,7 +47,7 @@ async function reassignLeadAction(formData: FormData) {
     redirect(`/team/leads?error=${encodeURIComponent("Choose a valid team member to reassign to.")}`);
   }
 
-  await reassignLead(session.user.agencyId, leadId, newOwnerId);
+  await reassignLead(session.user.agencyId, session.user.id, leadId, newOwnerId);
   redirect("/team/leads");
 }
 
@@ -83,6 +83,9 @@ export default async function TeamLeadsPage({
           {session.user.role === "head" ? "Agency Leads" : "Team Leads"}
         </h1>
         <div className="flex gap-4">
+          <a href="/api/export/leads?scope=team" className="text-sm text-gray-500 underline hover:text-gray-800">
+            Export CSV
+          </a>
           <Link href="/team/policies" className="text-sm text-gray-500 underline hover:text-gray-800">
             Team policies
           </Link>

@@ -50,9 +50,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     <div className="mx-auto max-w-2xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">My Leads</h1>
-        <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
-          Back to dashboard
-        </Link>
+        <div className="flex gap-4">
+          <a href="/api/export/leads" className="text-sm text-gray-500 underline hover:text-gray-800">
+            Export CSV
+          </a>
+          <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
+            Back to dashboard
+          </Link>
+        </div>
       </div>
 
       {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

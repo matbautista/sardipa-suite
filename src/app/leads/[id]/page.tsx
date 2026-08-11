@@ -66,7 +66,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
-    const result = await updateLead(session.user.agencyId, ownerId, id, readLeadInput(formData));
+    const result = await updateLead(session.user.agencyId, ownerId, session.user.id, id, readLeadInput(formData));
     if (!result.ok) {
       redirect(`/leads/${id}?error=${encodeURIComponent(result.error)}`);
     }
@@ -80,7 +80,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
-    await deleteLead(session.user.agencyId, ownerId, id);
+    await deleteLead(session.user.agencyId, ownerId, session.user.id, id);
     await checkIn(session.user.agencyId, session.user.id, RECORD_TYPE, id);
     redirect("/leads");
   }

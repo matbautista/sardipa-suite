@@ -54,6 +54,9 @@ export default async function TeamPoliciesPage({
           {session.user.role === "head" ? "Agency Policies" : "Team Policies"}
         </h1>
         <div className="flex gap-4">
+          <a href="/api/export/policies?scope=team" className="text-sm text-gray-500 underline hover:text-gray-800">
+            Export CSV
+          </a>
           <Link href="/team/leads" className="text-sm text-gray-500 underline hover:text-gray-800">
             Team leads
           </Link>

@@ -72,6 +72,9 @@ export default async function DashboardPage() {
               <Link href="/admin/health" className="text-sm text-gray-500 underline hover:text-gray-800">
                 System health
               </Link>
+              <Link href="/admin/activity" className="text-sm text-gray-500 underline hover:text-gray-800">
+                Activity log
+              </Link>
               <Link href="/admin/agencies" className="text-sm text-gray-500 underline hover:text-gray-800">
                 Manage agencies
               </Link>
@@ -101,6 +104,9 @@ export default async function DashboardPage() {
               <Link href="/agency/email-intake" className="text-sm text-gray-500 underline hover:text-gray-800">
                 Website inquiry intake
               </Link>
+              <Link href="/agency/activity" className="text-sm text-gray-500 underline hover:text-gray-800">
+                Activity log
+              </Link>
             </div>
           )}
           {(user.role === "manager" || user.role === "head") && (
@@ -116,6 +122,15 @@ export default async function DashboardPage() {
               </Link>
             </div>
           )}
+
+          <div className="mb-6 flex gap-4">
+            <Link href="/reminders" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Reminders
+            </Link>
+            <Link href="/search" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Search
+            </Link>
+          </div>
 
           {metrics && (
             <div className="mb-8">
