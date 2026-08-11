@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "start:supervised": "node scripts/watchdog.mjs",
+    "package": "node scripts/package-release.mjs",
+    "backup": "node scripts/backup.mjs",
     "lint": "eslint",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",

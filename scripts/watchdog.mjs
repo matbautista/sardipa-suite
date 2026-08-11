@@ -35,6 +35,29 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import Database from "better-sqlite3";
 
+// Load .env from the current directory before anything reads process.env
+// below — found missing during phase 17's actual deployment testing: this
+// script previously never loaded .env at all (unlike `next dev`/`next
+// build`/`next start`, which load it internally), so DATABASE_URL silently
+// fell back to DEFAULTS.DATABASE_URL below whenever it didn't happen to
+// match. That was invisible in dev (the default, "file:./dev.db", happens
+// to match the dev database's own name) but broke silently in the packaged
+// release (scripts/package-release.mjs's database is "agency-crm.db") —
+// RestartEvent/SystemAlert writes below all failed with "no such table"
+// against a wrong, auto-created empty file, caught by their own try/catch
+// and logged as non-fatal, so nothing crashed but restart history and the
+// restart-loop alert were silently never actually recorded. Uses Node's
+// built-in loader (no dotenv dependency, matching this script's existing
+// "must run standalone in the packaged folder" constraint); doesn't
+// override any variable already set in the real environment, same as
+// dotenv's own convention.
+try {
+  process.loadEnvFile();
+} catch {
+  // No .env present — fine if every needed var is already set in the
+  // real environment (e.g. a container/service manager injecting them).
+}
+
 const IS_WINDOWS = process.platform === "win32";
 
 // Spawns the `next` binary directly rather than going through `npm run

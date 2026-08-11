@@ -75,6 +75,9 @@ export default async function DashboardPage() {
               <Link href="/admin/activity" className="text-sm text-gray-500 underline hover:text-gray-800">
                 Activity log
               </Link>
+              <Link href="/admin/settings" className="text-sm text-gray-500 underline hover:text-gray-800">
+                System configuration
+              </Link>
               <Link href="/admin/agencies" className="text-sm text-gray-500 underline hover:text-gray-800">
                 Manage agencies
               </Link>
