@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getTravelDetails, saveTravelDetails, type TravelDetailsInput } from "@/lib/travel-details";
-import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getLockStatus, checkOut, checkIn, isLockedByOther } from "@/lib/record-lock";
 import { getPolicyOwnerId } from "@/lib/policies";
 import { resolveAccessibleOwner } from "@/lib/team-access";
 
@@ -16,11 +17,11 @@ export default async function TravelDetailsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; edit?: string }>;
 }) {
   const session = await requireAgencySession();
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, edit } = await searchParams;
 
   async function resolveOwnerOrRedirect(): Promise<string> {
     "use server";
@@ -47,6 +48,9 @@ export default async function TravelDetailsPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}/travel?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const input: TravelDetailsInput = {
       travelerName: String(formData.get("travelerName") ?? ""),
       passportNo: String(formData.get("passportNo") ?? ""),
@@ -76,21 +80,30 @@ export default async function TravelDetailsPage({
     notFound();
   }
 
+  const editMode = edit === "1";
   const lockStatus = await getLockStatus(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   const lockedByOther = lockStatus.locked && !lockStatus.heldBySelf;
-  if (!lockedByOther) {
+  if (editMode && !lockedByOther) {
     await checkOut(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   }
+  const formInert = lockedByOther || !editMode;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Travel Details</h1>
-        <form action={backToPolicyAction}>
-          <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
-            Back to policy
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          {!editMode && !lockedByOther && (
+            <Link href={`/policies/${id}/travel?edit=1`} className="text-sm text-gray-500 underline hover:text-gray-800">
+              Edit
+            </Link>
+          )}
+          <form action={backToPolicyAction}>
+            <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Back to policy
+            </button>
+          </form>
+        </div>
       </div>
 
       <p className="mt-1 text-xs text-gray-400">
@@ -108,8 +121,8 @@ export default async function TravelDetailsPage({
 
       <form
         action={saveAction}
-        inert={lockedByOther}
-        className={`mt-8 space-y-4 rounded-md border border-gray-200 p-4 ${lockedByOther ? "opacity-50" : ""}`}
+        inert={formInert}
+        className={`mt-8 space-y-4 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
       >
         <div className="grid grid-cols-2 gap-4">
           <div>

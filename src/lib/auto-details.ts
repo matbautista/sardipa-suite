@@ -1,4 +1,5 @@
 import { getScopedPrisma } from "@/lib/tenant-db";
+import { verifyOwnedPolicy } from "@/lib/policy-access";
 
 // Auto insurance requirement checklist (Section 10 phase 11 / Section 11's
 // Auto Insurance field list). Only the confirmed subset is modeled —
@@ -16,14 +17,9 @@ export type AutoDetailsInput = {
   yearReleased: string;
 };
 
-async function verifyOwnedPolicy(scoped: ReturnType<typeof getScopedPrisma>, ownerId: string, policyId: string) {
-  const policy = await scoped.policy.findUnique({ where: { id: policyId } });
-  return policy && policy.ownerId === ownerId ? policy : null;
-}
-
 export async function getAutoDetails(agencyId: string, ownerId: string, policyId: string) {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "auto");
   if (!policy) return null;
 
   const [autoOwner, vehicle] = await Promise.all([
@@ -40,7 +36,7 @@ export async function saveAutoDetails(
   input: AutoDetailsInput
 ): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "auto");
   if (!policy) {
     return { ok: false, error: "Policy not found." };
   }
@@ -55,8 +51,13 @@ export async function saveAutoDetails(
   if (!carMaker || !carModel) {
     return { ok: false, error: "Car maker and model are required." };
   }
-  if (!Number.isInteger(yearReleased) || yearReleased < 1900) {
-    return { ok: false, error: "Enter a valid year released." };
+  // Found in a full-app review: only a lower bound (1900) was ever
+  // checked — a value like 9999 passed silently. Next year is the upper
+  // bound, not the current one, since dealerships routinely sell next
+  // year's model before the calendar turns over.
+  const maxYearReleased = new Date().getFullYear() + 1;
+  if (!Number.isInteger(yearReleased) || yearReleased < 1900 || yearReleased > maxYearReleased) {
+    return { ok: false, error: `Enter a valid year released (1900–${maxYearReleased}).` };
   }
 
   await scoped.autoOwner.upsert({
@@ -75,7 +76,7 @@ export async function saveAutoDetails(
 
 export async function hasMinimumAutoInfo(agencyId: string, ownerId: string, policyId: string): Promise<boolean> {
   const scoped = getScopedPrisma(agencyId);
-  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId))) {
+  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId, "auto"))) {
     return false;
   }
   const [autoOwner, vehicle] = await Promise.all([

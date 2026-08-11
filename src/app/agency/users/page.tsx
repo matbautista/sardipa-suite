@@ -10,8 +10,13 @@ import { ResetPasswordButton } from "./reset-password-button";
 // phase 6). Create+reset-password need one-time secret display, so those
 // go through useActionState client components; deactivate/reactivate and
 // manager reassignment don't, so those stay plain server actions here.
-export default async function AgencyUsersPage() {
+export default async function AgencyUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; warning?: string }>;
+}) {
   const session = await requireHeadSession();
+  const { error, warning } = await searchParams;
   const { managers, agents } = await listAgencyUsers(session.user.agencyId);
 
   return (
@@ -22,6 +27,9 @@ export default async function AgencyUsersPage() {
           Back to dashboard
         </Link>
       </div>
+
+      {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {warning && <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{warning}</p>}
 
       <div className="mt-8">
         <h2 className="text-sm font-medium text-gray-700">Managers</h2>

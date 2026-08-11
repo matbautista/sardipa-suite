@@ -251,6 +251,14 @@ model Policy {
   gracePeriodEndsAt       DateTime?
   vulFundBalance          Float?
   vulFundBalanceUpdatedAt DateTime?
+  // Found in a full-app review: the daily renewal/lapsing job's automatic
+  // status transitions (Section 5) had no ActivityLog entry and Policy had
+  // no timestamp of its own either — so once a policy auto-lapsed, there
+  // was no record anywhere of when it happened. Now paired with an
+  // ActivityLog write (see renewal-job.ts) as the primary audit trail;
+  // this column is the row-level fallback, same role createdAt/updatedAt
+  // already play on every other table here.
+  updatedAt DateTime @updatedAt
 
   // Convenience pointer to which of this policy's Document rows is
   // specifically the proof of payment (nullable until uploaded)

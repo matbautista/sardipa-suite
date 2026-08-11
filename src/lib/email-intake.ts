@@ -144,6 +144,29 @@ function parseStructuredInquiry(subject: string, bodyText: string): ParsedInquir
   };
 }
 
+// Found in a full-app review: bodyText previously fell back to the raw,
+// untouched HTML string for an HTML-only email (no text/plain part) —
+// tags and all — which the structured-format line matcher below can never
+// match (a line like "<p>Name: Juan</p>" doesn't start with "Name"), so
+// every inquiry from an HTML-only sender was silently misclassified as
+// needs_review even when correctly formatted. Not a full HTML parser —
+// just enough to turn block-level breaks into newlines and strip tags/
+// entities so the "Label: value" per-line format survives extraction.
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<(br|\/p|\/div|\/li|\/tr|\/h[1-6])\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;/gi, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 async function createLeadFromInquiry(agencyId: string, subject: string, bodyText: string): Promise<void> {
   const parsed = parseStructuredInquiry(subject, bodyText);
   // Routed through the tenant-scoping layer, not the plain `prisma`
@@ -239,13 +262,25 @@ export async function getActiveEmailIntakeAlert(agencyId: string) {
 // IMAP polling (Section 5 points 3-4)
 // ─────────────────────────────────────────────────────────────────────────
 
+// Caps stored/displayed IMAP error text and redacts the mailbox password
+// if it happens to appear verbatim in it (found in a full-app review: this
+// was previously stored and shown raw with no defense at all — low risk in
+// practice since ImapFlow's own errors don't echo credentials, but nothing
+// stopped a future library change, or an unusual server response, from
+// putting it there).
+function sanitizeImapError(rawMessage: string, password: string | undefined): string {
+  const redacted = password ? rawMessage.split(password).join("[redacted]") : rawMessage;
+  return redacted.slice(0, 500);
+}
+
 export async function pollMailboxForAgency(agencyId: string): Promise<void> {
   const config = await prisma.emailIntakeConfig.findUnique({ where: { agencyId } });
   if (!config || !config.isEnabled) return;
 
   let client: ImapFlow | undefined;
+  let password: string | undefined;
   try {
-    const password = decryptSecret(config.encryptedPassword);
+    password = decryptSecret(config.encryptedPassword);
     client = new ImapFlow({
       host: config.imapHost,
       port: config.imapPort,
@@ -259,20 +294,35 @@ export async function pollMailboxForAgency(agencyId: string): Promise<void> {
     try {
       const uids = await client.search({ seen: false }, { uid: true });
       for (const uid of uids || []) {
-        const message = await client.fetchOne(String(uid), { source: true, envelope: true }, { uid: true });
-        if (!message || !message.source) continue;
+        // Found in a full-app review: this whole loop body previously had
+        // no per-message error isolation — one email that threw (a parse
+        // failure, a DB error) meant it never got marked \Seen, so every
+        // *other* still-unread email in the same poll was abandoned too
+        // (the throw skipped the rest of the loop entirely), and since the
+        // next poll re-fetches the same unseen messages, that one poison
+        // email would silently re-block everything behind it forever. Each
+        // message now succeeds or fails independently: a failure here is
+        // logged and left unmarked (so it's not silently dropped and stays
+        // available for another look), but doesn't stop its neighbors.
+        try {
+          const message = await client.fetchOne(String(uid), { source: true, envelope: true }, { uid: true });
+          if (!message || !message.source) continue;
 
-        const parsedMail = await simpleParser(message.source);
-        const bodyText = parsedMail.text ?? (typeof parsedMail.html === "string" ? parsedMail.html : "") ?? "";
-        const subject = parsedMail.subject ?? message.envelope?.subject ?? "";
+          const parsedMail = await simpleParser(message.source);
+          const bodyText =
+            parsedMail.text ?? (typeof parsedMail.html === "string" ? htmlToPlainText(parsedMail.html) : "") ?? "";
+          const subject = parsedMail.subject ?? message.envelope?.subject ?? "";
 
-        await createLeadFromInquiry(agencyId, subject, bodyText);
-        // Marks it read so it's never imported twice on the next poll
-        // (point 4) — chosen over moving to a "Processed" folder, since a
-        // dedicated folder isn't guaranteed to exist across arbitrary IMAP
-        // providers and creating one adds a failure mode of its own for no
-        // real benefit here.
-        await client.messageFlagsAdd([uid], ["\\Seen"], { uid: true });
+          await createLeadFromInquiry(agencyId, subject, bodyText);
+          // Marks it read so it's never imported twice on the next poll
+          // (point 4) — chosen over moving to a "Processed" folder, since a
+          // dedicated folder isn't guaranteed to exist across arbitrary IMAP
+          // providers and creating one adds a failure mode of its own for no
+          // real benefit here.
+          await client.messageFlagsAdd([uid], ["\\Seen"], { uid: true });
+        } catch (messageError) {
+          console.error(`[email-intake] failed to process message uid ${uid} for agency ${agencyId}:`, messageError);
+        }
       }
     } finally {
       lock.release();
@@ -284,7 +334,8 @@ export async function pollMailboxForAgency(agencyId: string): Promise<void> {
     });
     await resolveEmailIntakeAlert(agencyId);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown IMAP error";
+    const rawMessage = error instanceof Error ? error.message : "Unknown IMAP error";
+    const message = sanitizeImapError(rawMessage, password);
     await prisma.emailIntakeConfig.update({
       where: { agencyId },
       data: { lastErrorAt: new Date(), lastErrorMessage: message },

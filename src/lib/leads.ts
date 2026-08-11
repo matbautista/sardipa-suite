@@ -233,7 +233,24 @@ export async function listUnassignedOrNeedsReviewLeads(agencyId: string) {
   });
 }
 
-export async function claimLead(agencyId: string, callerId: string, leadId: string): Promise<ActionResult> {
+// targetOwnerId: found in a full-app review that this previously always
+// assigned to callerId — the claiming Manager/Head themselves — with no
+// way to hand it straight to one of their agents, contradicting Section
+// 5's "a Manager assigns them to one of their own team's agents, or
+// Agency Head to anyone" (point 6). Defaults to the caller (preserving the
+// original one-click "Claim into my own queue" behavior) when omitted;
+// when given, callerOwnerIds (already resolved by the caller via
+// getTeamMemberIds(), same pattern as reassignLead) proves it's actually
+// one of the caller's own team members — a Manager still can't hand an
+// unassigned lead to someone outside their team.
+export async function claimLead(
+  agencyId: string,
+  callerId: string,
+  leadId: string,
+  callerOwnerIds: string[],
+  targetOwnerId?: string
+): Promise<ActionResult> {
+  const ownerId = targetOwnerId && callerOwnerIds.includes(targetOwnerId) ? targetOwnerId : callerId;
   const scoped = getScopedPrisma(agencyId);
   const lead = await scoped.lead.findUnique({ where: { id: leadId } });
   if (!lead) {
@@ -242,7 +259,7 @@ export async function claimLead(agencyId: string, callerId: string, leadId: stri
   if (lead.ownerId !== null) {
     return { ok: false, error: "This lead is already assigned to someone." };
   }
-  await scoped.lead.update({ where: { id: leadId }, data: { ownerId: callerId } });
+  await scoped.lead.update({ where: { id: leadId }, data: { ownerId } });
   await scoped.activityLog.create({ data: { userId: callerId, leadId, action: "lead_claimed", note: null } });
   return { ok: true };
 }

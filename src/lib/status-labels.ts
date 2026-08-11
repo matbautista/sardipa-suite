@@ -60,4 +60,10 @@ export const ACTIVITY_ACTION_LABELS: Record<string, string> = {
   login_failed: "Login failed",
   login_locked_out: "Login attempted while locked out",
   login_failed_lockout_triggered: "Login failed — account locked",
+  storage_check_run: "Storage check run",
+  alert_resolved: "Alert marked resolved",
+  policy_auto_lapsed: "Policy automatically lapsed",
+  policy_entered_grace_period: "Policy entered grace period",
+  policy_completed: "Travel policy completed",
+  policy_reassigned: "Policy reassigned",
 };

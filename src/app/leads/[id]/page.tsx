@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getOwnLead, getLeadOwnerId, updateLead, deleteLead, type LeadInput } from "@/lib/leads";
 import { listInsuranceLines } from "@/lib/insurance-lines";
-import { getLockStatus, checkOut, checkIn, forceRelease } from "@/lib/record-lock";
+import { getLockStatus, checkOut, checkIn, forceRelease, isLockedByOther } from "@/lib/record-lock";
 import { getPolicyForLead } from "@/lib/policies";
 import { resolveAccessibleOwner } from "@/lib/team-access";
 
@@ -31,9 +31,16 @@ function toDateInputValue(date: Date | null): string {
   return date ? date.toISOString().slice(0, 10) : "";
 }
 
-export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeadDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string; edit?: string }>;
+}) {
   const session = await requireAgencySession();
   const { id } = await params;
+  const { error, edit } = await searchParams;
 
   // Resolves "which owner's lead may this caller touch" once, the same
   // pattern as policies/[id]/page.tsx (phase 12). Re-derives its own
@@ -66,6 +73,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/leads/${id}?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const result = await updateLead(session.user.agencyId, ownerId, session.user.id, id, readLeadInput(formData));
     if (!result.ok) {
       redirect(`/leads/${id}?error=${encodeURIComponent(result.error)}`);
@@ -80,6 +90,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/leads/${id}?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const result = await deleteLead(session.user.agencyId, ownerId, session.user.id, id);
     if (!result.ok) {
       // Found in a full-app review: this previously ignored a delete
@@ -147,14 +160,18 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
-  // Opening this page doubles as entering edit mode — there's no separate
-  // read-only view yet. The lock itself is always keyed to the real caller
-  // (session.user.id), never the resolved owner — see record-lock.ts.
+  // Only "?edit=1" (the Edit button below) checks the record out — plain
+  // viewing never does (Section 5: "viewing a record never requires a
+  // lock — only entering edit mode does"). The lock itself is always keyed
+  // to the real caller (session.user.id), never the resolved owner — see
+  // record-lock.ts.
+  const editMode = edit === "1";
   const lockStatus = await getLockStatus(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   const lockedByOther = lockStatus.locked && !lockStatus.heldBySelf;
-  if (!lockedByOther) {
+  if (editMode && !lockedByOther) {
     await checkOut(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   }
+  const formInert = lockedByOther || !editMode;
 
   const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
   const existingPolicy =
@@ -164,12 +181,21 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     <div className="mx-auto max-w-2xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">{lead.name}</h1>
-        <form action={backToLeadsAction}>
-          <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
-            {viewingOwnRecord ? "Back to my leads" : "Back to team leads"}
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          {!editMode && !lockedByOther && (
+            <Link href={`/leads/${id}?edit=1`} className="text-sm text-gray-500 underline hover:text-gray-800">
+              Edit
+            </Link>
+          )}
+          <form action={backToLeadsAction}>
+            <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
+              {viewingOwnRecord ? "Back to my leads" : "Back to team leads"}
+            </button>
+          </form>
+        </div>
       </div>
+
+      {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       {!viewingOwnRecord && <p className="mt-1 text-sm text-gray-500">Owned by {lead.owner?.name ?? "—"}</p>}
 
@@ -213,8 +239,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
       <form
         action={updateLeadAction}
-        inert={lockedByOther}
-        className={`mt-8 space-y-4 ${lockedByOther ? "opacity-50" : ""}`}
+        inert={formInert}
+        className={`mt-8 space-y-4 ${formInert ? "opacity-50" : ""}`}
       >
         <div>
           <label className="block text-sm font-medium text-gray-700">Name</label>

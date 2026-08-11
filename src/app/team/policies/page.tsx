@@ -1,12 +1,35 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireManagerOrHeadSession } from "@/lib/session";
 import { getTeamMemberIds, listTeamMembers } from "@/lib/team-access";
-import { listTeamPolicies } from "@/lib/policies";
+import { listTeamPolicies, reassignPolicy } from "@/lib/policies";
 
 // Manager/Head cross-visibility for Policies (Section 10 phase 12 / Section
-// 3's "View other agents' leads/sales"). No reassignment control here —
-// unlike Leads, the plan never lists policy reassignment as a capability
-// (Section 3's table only calls out "Reassign leads between agents").
+// 3's "View other agents' leads/sales"). Reassignment control added here in
+// a full-app review: Section 3's permissions table only calls out lead
+// reassignment as a day-to-day pipeline action, but Section 5's Deactivation
+// bullet separately requires "a Manager/Agency Head reassigns their open
+// leads/policies to someone active" — that's a real capability gap this
+// page (and reassignPolicy() in policies.ts) closes, not a re-litigation of
+// Section 3's table.
+
+async function reassignPolicyAction(formData: FormData) {
+  "use server";
+  const session = await requireManagerOrHeadSession();
+  const policyId = String(formData.get("policyId") ?? "");
+  const newOwnerId = String(formData.get("newOwnerId") ?? "");
+
+  const teamMemberIds = await getTeamMemberIds(session.user.agencyId, session.user.id, session.user.role);
+  if (!newOwnerId || !teamMemberIds.includes(newOwnerId)) {
+    redirect(`/team/policies?error=${encodeURIComponent("Choose a valid team member to reassign to.")}`);
+  }
+
+  const result = await reassignPolicy(session.user.agencyId, session.user.id, teamMemberIds, policyId, newOwnerId);
+  if (!result.ok) {
+    redirect(`/team/policies?error=${encodeURIComponent(result.error)}`);
+  }
+  redirect("/team/policies");
+}
 
 const STATUSES = ["draft", "active", "grace_period", "lapsed", "cancelled", "completed"] as const;
 
@@ -22,10 +45,10 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function TeamPoliciesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; ownerId?: string }>;
+  searchParams: Promise<{ status?: string; ownerId?: string; error?: string }>;
 }) {
   const session = await requireManagerOrHeadSession();
-  const { status, ownerId } = await searchParams;
+  const { status, ownerId, error } = await searchParams;
 
   const [teamMemberIds, teamMembers] = await Promise.all([
     getTeamMemberIds(session.user.agencyId, session.user.id, session.user.role),
@@ -43,7 +66,13 @@ export default async function TeamPoliciesPage({
   const leaderboard = teamMembers.map((member) => {
     const ownPolicies = allTeamPolicies.filter((policy) => policy.ownerId === member.id);
     const counts = Object.fromEntries(STATUSES.map((s) => [s, ownPolicies.filter((p) => p.status === s).length]));
-    const totalPremium = ownPolicies.reduce((sum, p) => sum + p.premium, 0);
+    // Found in a full-app review: this previously summed every policy's
+    // premium regardless of status, including draft (and cancelled) ones —
+    // contradicting the spec's "revenue counts active status and later, a
+    // draft isn't a completed sale yet," which dashboard-metrics.ts already
+    // implements correctly elsewhere. Same "!== draft" filter as there, so
+    // this leaderboard and /team/dashboard agree on the same agency's revenue.
+    const totalPremium = ownPolicies.filter((p) => p.status !== "draft").reduce((sum, p) => sum + p.premium, 0);
     return { member, total: ownPolicies.length, counts, totalPremium };
   });
 
@@ -68,6 +97,8 @@ export default async function TeamPoliciesPage({
           </Link>
         </div>
       </div>
+
+      {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       <section className="mt-8">
         <h2 className="text-sm font-medium text-gray-700">Leaderboard</h2>
@@ -158,6 +189,27 @@ export default async function TeamPoliciesPage({
                   {STATUS_LABELS[policy.status] ?? policy.status}
                 </span>
               </Link>
+              <form action={reassignPolicyAction} className="mt-2 flex items-center gap-2">
+                <input type="hidden" name="policyId" value={policy.id} />
+                <label className="text-xs text-gray-500">Reassign to:</label>
+                <select
+                  name="newOwnerId"
+                  defaultValue=""
+                  className="rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
+                >
+                  <option value="">— choose —</option>
+                  {teamMembers
+                    .filter((member) => member.id !== policy.ownerId)
+                    .map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.name}
+                      </option>
+                    ))}
+                </select>
+                <button type="submit" className="text-xs text-gray-500 underline hover:text-gray-800">
+                  Reassign
+                </button>
+              </form>
             </li>
           ))}
           {filteredPolicies.length === 0 && (

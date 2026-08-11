@@ -35,6 +35,50 @@ export async function createInsuranceLine(agencyId: string, name: string, catego
   return { ok: true };
 }
 
+// Found in a full-app review: there was previously no in-app way to fix a
+// typo'd line/product name at all — only "add", never "edit". Deliberately
+// rename-only, not category-editable: category drives which detail tables,
+// forms, and lapsing rules apply (Section 4/6), so changing it out from
+// under a line that may already have products/policies attached risks
+// silently orphaning that existing data's category-specific tables. A
+// mis-picked category is meant to be fixed by creating a fresh line, not
+// edited in place — this only covers the always-safe free-text rename.
+export async function renameInsuranceLine(agencyId: string, lineId: string, name: string): Promise<ActionResult> {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    return { ok: false, error: "Line name is required." };
+  }
+  const scoped = getScopedPrisma(agencyId);
+  const line = await scoped.insuranceLine.findUnique({ where: { id: lineId } });
+  if (!line) {
+    return { ok: false, error: "That insurance line doesn't exist." };
+  }
+  await scoped.insuranceLine.update({ where: { id: lineId }, data: { name: trimmedName } });
+  return { ok: true };
+}
+
+export async function updateProduct(
+  agencyId: string,
+  productId: string,
+  name: string,
+  description: string
+): Promise<ActionResult> {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    return { ok: false, error: "Product name is required." };
+  }
+  const scoped = getScopedPrisma(agencyId);
+  const product = await scoped.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    return { ok: false, error: "That product doesn't exist." };
+  }
+  await scoped.product.update({
+    where: { id: productId },
+    data: { name: trimmedName, description: description.trim() || null },
+  });
+  return { ok: true };
+}
+
 export async function createProduct(
   agencyId: string,
   lineId: string,

@@ -84,7 +84,16 @@ export const proxy = auth(async (req) => {
   }
 
   if (isLoginPage) {
-    return isLoggedIn ? NextResponse.redirect(new URL("/dashboard", req.nextUrl)) : NextResponse.next();
+    if (!isLoggedIn) {
+      return NextResponse.next();
+    }
+    // Found in a full-app review: this always bounced a signed-in visitor
+    // straight to /dashboard, even a temp-password user who still needs
+    // the change-password gate below — they'd land on /dashboard for one
+    // request, then get redirected again on the very next one. Sending
+    // them straight to /change-password here avoids that extra hop.
+    const destination = req.auth!.user.mustChangePassword ? "/change-password" : "/dashboard";
+    return NextResponse.redirect(new URL(destination, req.nextUrl));
   }
   if (!isLoggedIn) {
     const loginUrl = new URL("/login", req.nextUrl);

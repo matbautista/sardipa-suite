@@ -1,4 +1,5 @@
 import { getScopedPrisma } from "@/lib/tenant-db";
+import { verifyOwnedPolicy } from "@/lib/policy-access";
 
 // Property/Fire insurance requirement checklist (Section 10 phase 11 /
 // Section 11's Property field list). Section 11 marks this line's entire
@@ -21,16 +22,11 @@ export type PropertyDetailsInput = {
   perilsCovered: string;
 };
 
-async function verifyOwnedPolicy(scoped: ReturnType<typeof getScopedPrisma>, ownerId: string, policyId: string) {
-  const policy = await scoped.policy.findUnique({ where: { id: policyId } });
-  return policy && policy.ownerId === ownerId ? policy : null;
-}
-
 // undefined = no such policy (caller should 404); null = policy exists but
 // no PropertyDetail saved yet (caller should render an empty form, not 404)
 export async function getPropertyDetails(agencyId: string, ownerId: string, policyId: string) {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "property");
   if (!policy) return undefined;
   return scoped.propertyDetail.findUnique({ where: { policyId } });
 }
@@ -42,7 +38,7 @@ export async function savePropertyDetails(
   input: PropertyDetailsInput
 ): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "property");
   if (!policy) {
     return { ok: false, error: "Policy not found." };
   }
@@ -77,7 +73,7 @@ export async function savePropertyDetails(
 
 export async function hasMinimumPropertyInfo(agencyId: string, ownerId: string, policyId: string): Promise<boolean> {
   const scoped = getScopedPrisma(agencyId);
-  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId))) {
+  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId, "property"))) {
     return false;
   }
   const detail = await scoped.propertyDetail.findUnique({ where: { policyId } });

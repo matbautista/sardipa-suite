@@ -25,7 +25,9 @@ async function claimLeadAction(formData: FormData) {
   "use server";
   const session = await requireManagerOrHeadSession();
   const leadId = String(formData.get("leadId") ?? "");
-  const result = await claimLead(session.user.agencyId, session.user.id, leadId);
+  const targetOwnerId = String(formData.get("targetOwnerId") ?? "") || undefined;
+  const teamMemberIds = await getTeamMemberIds(session.user.agencyId, session.user.id, session.user.role);
+  const result = await claimLead(session.user.agencyId, session.user.id, leadId, teamMemberIds, targetOwnerId);
   if (!result.ok) {
     redirect(`/team/leads?error=${encodeURIComponent(result.error)}`);
   }
@@ -122,8 +124,22 @@ export default async function TeamLeadsPage({
                 </span>
               </div>
               {lead.ownerId === null ? (
-                <form action={claimLeadAction}>
+                <form action={claimLeadAction} className="flex items-center gap-2">
                   <input type="hidden" name="leadId" value={lead.id} />
+                  <select
+                    name="targetOwnerId"
+                    defaultValue=""
+                    className="rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
+                  >
+                    <option value="">Claim for myself</option>
+                    {teamMembers
+                      .filter((member) => member.id !== session.user.id)
+                      .map((member) => (
+                        <option key={member.id} value={member.id}>
+                          Assign to {member.name}
+                        </option>
+                      ))}
+                  </select>
                   <button type="submit" className="text-xs text-gray-500 underline hover:text-gray-800">
                     Claim
                   </button>

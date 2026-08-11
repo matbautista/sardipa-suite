@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireHeadSession } from "@/lib/session";
 import {
   createAgencyManager,
@@ -76,7 +77,17 @@ export async function toggleActiveAction(formData: FormData) {
   const targetUserId = String(formData.get("targetUserId") ?? "");
   const nextActive = String(formData.get("nextActive") ?? "") === "true";
 
-  await setAgencyUserActive(session.user.agencyId, targetUserId, nextActive);
+  const result = await setAgencyUserActive(session.user.agencyId, targetUserId, nextActive);
+  if (!result.ok) {
+    // Found in a full-app review: a failure here (e.g. a stale
+    // targetUserId that no longer resolves) was previously discarded —
+    // the form just appeared to do nothing. Same redirect-with-error
+    // pattern the rest of the app uses post-review.
+    redirect(`/agency/users?error=${encodeURIComponent(result.error)}`);
+  }
+  if (result.warning) {
+    redirect(`/agency/users?warning=${encodeURIComponent(result.warning)}`);
+  }
   revalidatePath("/agency/users");
 }
 
@@ -85,6 +96,9 @@ export async function reassignManagerAction(formData: FormData) {
   const agentUserId = String(formData.get("agentUserId") ?? "");
   const managerId = String(formData.get("managerId") ?? "") || null;
 
-  await reassignAgentManager(session.user.agencyId, agentUserId, managerId);
+  const result = await reassignAgentManager(session.user.agencyId, agentUserId, managerId);
+  if (!result.ok) {
+    redirect(`/agency/users?error=${encodeURIComponent(result.error)}`);
+  }
   revalidatePath("/agency/users");
 }

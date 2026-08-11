@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import { getAutoDetails, saveAutoDetails, type AutoDetailsInput } from "@/lib/auto-details";
-import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getLockStatus, checkOut, checkIn, isLockedByOther } from "@/lib/record-lock";
 import { getPolicyOwnerId } from "@/lib/policies";
 import { resolveAccessibleOwner } from "@/lib/team-access";
 
@@ -15,11 +16,11 @@ export default async function AutoDetailsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; edit?: string }>;
 }) {
   const session = await requireAgencySession();
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, edit } = await searchParams;
 
   async function resolveOwnerOrRedirect(): Promise<string> {
     "use server";
@@ -46,6 +47,9 @@ export default async function AutoDetailsPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}/auto?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const input: AutoDetailsInput = {
       completeName: String(formData.get("completeName") ?? ""),
       carMaker: String(formData.get("carMaker") ?? ""),
@@ -74,11 +78,16 @@ export default async function AutoDetailsPage({
     notFound();
   }
 
+  // Only "?edit=1" (the Edit button below) checks the record out — plain
+  // viewing never does (Section 5: "viewing a record never requires a
+  // lock — only entering edit mode does").
+  const editMode = edit === "1";
   const lockStatus = await getLockStatus(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   const lockedByOther = lockStatus.locked && !lockStatus.heldBySelf;
-  if (!lockedByOther) {
+  if (editMode && !lockedByOther) {
     await checkOut(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   }
+  const formInert = lockedByOther || !editMode;
 
   const { autoOwner, vehicle } = details;
 
@@ -86,11 +95,18 @@ export default async function AutoDetailsPage({
     <div className="mx-auto max-w-2xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Owner &amp; Vehicle Details</h1>
-        <form action={backToPolicyAction}>
-          <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
-            Back to policy
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          {!editMode && !lockedByOther && (
+            <Link href={`/policies/${id}/auto?edit=1`} className="text-sm text-gray-500 underline hover:text-gray-800">
+              Edit
+            </Link>
+          )}
+          <form action={backToPolicyAction}>
+            <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Back to policy
+            </button>
+          </form>
+        </div>
       </div>
 
       {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -104,8 +120,8 @@ export default async function AutoDetailsPage({
 
       <form
         action={saveAction}
-        inert={lockedByOther}
-        className={`mt-8 space-y-4 rounded-md border border-gray-200 p-4 ${lockedByOther ? "opacity-50" : ""}`}
+        inert={formInert}
+        className={`mt-8 space-y-4 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
       >
         <div>
           <label className="block text-sm font-medium text-gray-700">Complete name of owner</label>

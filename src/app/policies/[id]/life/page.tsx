@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAgencySession } from "@/lib/session";
 import {
@@ -11,7 +12,7 @@ import {
   type OwnerExtraInput,
   type BeneficiaryInput,
 } from "@/lib/life-details";
-import { getLockStatus, checkOut, checkIn } from "@/lib/record-lock";
+import { getLockStatus, checkOut, checkIn, isLockedByOther } from "@/lib/record-lock";
 import { getPolicyOwnerId } from "@/lib/policies";
 import { resolveAccessibleOwner } from "@/lib/team-access";
 
@@ -237,11 +238,11 @@ export default async function LifeDetailsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; edit?: string }>;
 }) {
   const session = await requireAgencySession();
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, edit } = await searchParams;
 
   // Same "resolve access once" pattern as policies/[id]/page.tsx (phase 12).
   async function resolveOwnerOrRedirect(): Promise<string> {
@@ -269,6 +270,9 @@ export default async function LifeDetailsPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}/life?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const isSmoker = formData.get("isSmoker") === "on";
     const result = await saveInsured(session.user.agencyId, ownerId, id, isSmoker, readPersonInput(formData));
     if (!result.ok) {
@@ -281,6 +285,9 @@ export default async function LifeDetailsPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}/life?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const isSameAsInsured = formData.get("isSameAsInsured") === "on";
     const extra: OwnerExtraInput = {
       employerBusinessName: String(formData.get("employerBusinessName") ?? ""),
@@ -312,6 +319,9 @@ export default async function LifeDetailsPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}/life?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const beneficiaryType = String(formData.get("beneficiaryType") ?? "") as "primary" | "contingent";
     const slotNumber = Number(formData.get("slotNumber"));
     const input: BeneficiaryInput = {
@@ -334,6 +344,9 @@ export default async function LifeDetailsPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}/life?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const beneficiaryType = String(formData.get("beneficiaryType") ?? "");
     const slotNumber = Number(formData.get("slotNumber"));
     await deleteBeneficiary(session.user.agencyId, ownerId, id, beneficiaryType, slotNumber);
@@ -354,11 +367,13 @@ export default async function LifeDetailsPage({
     notFound();
   }
 
+  const editMode = edit === "1";
   const lockStatus = await getLockStatus(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   const lockedByOther = lockStatus.locked && !lockStatus.heldBySelf;
-  if (!lockedByOther) {
+  if (editMode && !lockedByOther) {
     await checkOut(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   }
+  const formInert = lockedByOther || !editMode;
 
   const { insured, owner, beneficiaries } = details;
   const beneficiaryByKey = new Map(beneficiaries.map((b) => [`${b.beneficiaryType}-${b.slotNumber}`, b]));
@@ -367,11 +382,18 @@ export default async function LifeDetailsPage({
     <div className="mx-auto max-w-2xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Life Insurance Details</h1>
-        <form action={backToPolicyAction}>
-          <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
-            Back to policy
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          {!editMode && !lockedByOther && (
+            <Link href={`/policies/${id}/life?edit=1`} className="text-sm text-gray-500 underline hover:text-gray-800">
+              Edit
+            </Link>
+          )}
+          <form action={backToPolicyAction}>
+            <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Back to policy
+            </button>
+          </form>
+        </div>
       </div>
 
       {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -387,8 +409,8 @@ export default async function LifeDetailsPage({
         <h2 className="text-sm font-medium text-gray-700">Insured</h2>
         <form
           action={saveInsuredAction}
-          inert={lockedByOther}
-          className={`mt-3 space-y-4 rounded-md border border-gray-200 p-4 ${lockedByOther ? "opacity-50" : ""}`}
+          inert={formInert}
+          className={`mt-3 space-y-4 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
         >
           <PersonFieldset person={insured?.person ?? null} />
           <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -408,8 +430,8 @@ export default async function LifeDetailsPage({
         <h2 className="text-sm font-medium text-gray-700">Owner</h2>
         <form
           action={saveOwnerAction}
-          inert={lockedByOther}
-          className={`mt-3 space-y-4 rounded-md border border-gray-200 p-4 ${lockedByOther ? "opacity-50" : ""}`}
+          inert={formInert}
+          className={`mt-3 space-y-4 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
         >
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" name="isSameAsInsured" defaultChecked={owner?.isSameAsInsured ?? false} />
@@ -507,8 +529,8 @@ export default async function LifeDetailsPage({
               <form
                 key={`${type}-${slot}`}
                 action={saveBeneficiaryAction}
-                inert={lockedByOther}
-                className={`space-y-3 rounded-md border border-gray-200 p-4 ${lockedByOther ? "opacity-50" : ""}`}
+                inert={formInert}
+                className={`space-y-3 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
               >
                 <input type="hidden" name="beneficiaryType" value={type} />
                 <input type="hidden" name="slotNumber" value={slot} />

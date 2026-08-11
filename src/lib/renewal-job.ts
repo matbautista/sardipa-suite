@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 
 // Policy Renewal & Lapsing daily job (Section 10 phase 9 / Section 5's
@@ -6,13 +7,44 @@ import { prisma } from "@/lib/prisma";
 // single agency's tenant-scoped client can express, so it uses the plain
 // prisma singleton directly rather than getScopedPrisma.
 //
-// No ActivityLog entry is written for these automatic transitions:
-// ActivityLog.userId is required (Section 6), and there's no real user to
-// attribute an automated status change to — a synthetic "system" actor
-// wasn't part of what this phase was asked to build. The Policy's own
-// status field is still the source of truth for what happened and when.
+// Every automatic transition below writes to ActivityLog, attributed to a
+// reserved "system" actor (getSystemActorId() below) — found in a full-app
+// review that this had been skipped ("ActivityLog.userId is required, and
+// there's no real user to attribute an automated status change to"), but
+// Section 5's Audit/Activity Log requirement doesn't carve out an exception
+// for automated changes: "every create/update/delete on a ... Policy ...
+// is written to ActivityLog" applies here exactly as much as to a
+// human-triggered one. Policy.updatedAt (schema) is the row-level fallback
+// for "when," same role it plays on every other table.
 
 const GRACE_PERIOD_DAYS = 30;
+
+const SYSTEM_ACTOR_EMAIL = "system@saripda.internal";
+
+// Gets or lazily creates the reserved system-actor User row that automated
+// jobs attribute their ActivityLog writes to. isActive: false makes it
+// permanently unable to log in (verifyCredentials's isActive check runs
+// before any password comparison) — this account exists purely as an
+// ActivityLog.userId target, never as a real login. agencyId is left null,
+// same as Super Admin: this actor sits outside every agency, since the job
+// itself runs host-wide.
+async function getSystemActorId(): Promise<string> {
+  const existing = await prisma.user.findUnique({ where: { email: SYSTEM_ACTOR_EMAIL } });
+  if (existing) return existing.id;
+  const created = await prisma.user.create({
+    data: {
+      name: "System (automated)",
+      email: SYSTEM_ACTOR_EMAIL,
+      // Random, not a real bcrypt hash — isActive: false already blocks
+      // login before this would ever be compared against, but there's no
+      // reason for it to even look like a usable credential.
+      passwordHash: randomBytes(32).toString("hex"),
+      role: "system",
+      isActive: false,
+    },
+  });
+  return created.id;
+}
 
 export type RenewalJobResult = {
   lapsed: number;
@@ -24,6 +56,7 @@ export type RenewalJobResult = {
 export async function runRenewalJob(): Promise<RenewalJobResult> {
   const now = new Date();
   const result: RenewalJobResult = { lapsed: 0, enteredGracePeriod: 0, completed: 0, gracePeriodLapsed: 0 };
+  const systemActorId = await getSystemActorId();
 
   const dueActivePolicies = await prisma.policy.findMany({
     where: { status: "active", renewalDate: { lte: now } },
@@ -35,6 +68,9 @@ export async function runRenewalJob(): Promise<RenewalJobResult> {
       // Per-trip coverage: once the end date (renewalDate) passes, it's
       // simply done — no lapsing, no grace period, no renewal.
       await prisma.policy.update({ where: { id: policy.id }, data: { status: "completed" } });
+      await prisma.activityLog.create({
+        data: { userId: systemActorId, agencyId: policy.agencyId, policyId: policy.id, action: "policy_completed", note: null },
+      });
       result.completed++;
       continue;
     }
@@ -53,6 +89,15 @@ export async function runRenewalJob(): Promise<RenewalJobResult> {
         where: { id: policy.id },
         data: { status: "grace_period", gracePeriodEndsAt },
       });
+      await prisma.activityLog.create({
+        data: {
+          userId: systemActorId,
+          agencyId: policy.agencyId,
+          policyId: policy.id,
+          action: "policy_entered_grace_period",
+          note: `Grace period ends ${gracePeriodEndsAt.toLocaleDateString()}`,
+        },
+      });
       result.enteredGracePeriod++;
       continue;
     }
@@ -60,6 +105,9 @@ export async function runRenewalJob(): Promise<RenewalJobResult> {
     // Everything else — non-life yearly lines (Auto/Property/Health) and
     // Life Term/Traditional — lapses immediately.
     await prisma.policy.update({ where: { id: policy.id }, data: { status: "lapsed" } });
+    await prisma.activityLog.create({
+      data: { userId: systemActorId, agencyId: policy.agencyId, policyId: policy.id, action: "policy_auto_lapsed", note: null },
+    });
     result.lapsed++;
   }
 
@@ -70,6 +118,15 @@ export async function runRenewalJob(): Promise<RenewalJobResult> {
     await prisma.policy.update({
       where: { id: policy.id },
       data: { status: "lapsed", gracePeriodEndsAt: null },
+    });
+    await prisma.activityLog.create({
+      data: {
+        userId: systemActorId,
+        agencyId: policy.agencyId,
+        policyId: policy.id,
+        action: "policy_auto_lapsed",
+        note: "Grace period ended without a recorded renewal",
+      },
     });
     result.gracePeriodLapsed++;
   }

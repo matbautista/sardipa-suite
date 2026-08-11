@@ -65,14 +65,20 @@ export async function createAgencyWithHead(
     return { agency, head };
   });
 
-  // Logged against agency.id (not null) since it's about that agency's own
-  // history, even though the actor — the Super Admin — doesn't belong to
-  // any agency themselves; userId is the actual actor, not the new Head,
-  // who didn't do anything here.
+  // agencyId: null, not agency.id — found in a full-app review: logging
+  // this against the new agency meant it only ever showed up on *that*
+  // agency's own Head-facing log (/agency/activity), attributed to a
+  // Super Admin who isn't even a member of it, and never on the Super
+  // Admin's own Host Activity Log (/admin/activity), which is
+  // deliberately scoped to agencyId-null entries — see
+  // src/app/admin/activity/page.tsx and src/lib/activity-log.ts's
+  // listHostActivityLog. This is the Super Admin's own action (onboarding
+  // a new agency), the same shape as storage-locations.ts's equivalent
+  // Super-Admin action, which already logs it this way.
   await prisma.activityLog.create({
     data: {
       userId: actorUserId,
-      agencyId: agency.id,
+      agencyId: null,
       action: "agency_and_head_created",
       note: `Agency "${agency.name}" and its first Agency Head account (${head.email}) created`,
     },

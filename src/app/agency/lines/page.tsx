@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireHeadSession } from "@/lib/session";
-import { listInsuranceLines, createInsuranceLine, createProduct } from "@/lib/insurance-lines";
+import {
+  listInsuranceLines,
+  createInsuranceLine,
+  createProduct,
+  renameInsuranceLine,
+  updateProduct,
+} from "@/lib/insurance-lines";
 
 const CATEGORIES = ["life", "auto", "property", "health", "travel", "other"] as const;
 const LIFE_POLICY_TYPES = ["term", "non_term_traditional", "vul"] as const;
@@ -13,6 +19,33 @@ async function createLineAction(formData: FormData) {
   const category = String(formData.get("category") ?? "");
 
   const result = await createInsuranceLine(session.user.agencyId, name, category);
+  if (!result.ok) {
+    redirect(`/agency/lines?error=${encodeURIComponent(result.error)}`);
+  }
+  redirect("/agency/lines");
+}
+
+async function renameLineAction(formData: FormData) {
+  "use server";
+  const session = await requireHeadSession();
+  const lineId = String(formData.get("lineId") ?? "");
+  const name = String(formData.get("name") ?? "");
+
+  const result = await renameInsuranceLine(session.user.agencyId, lineId, name);
+  if (!result.ok) {
+    redirect(`/agency/lines?error=${encodeURIComponent(result.error)}`);
+  }
+  redirect("/agency/lines");
+}
+
+async function updateProductAction(formData: FormData) {
+  "use server";
+  const session = await requireHeadSession();
+  const productId = String(formData.get("productId") ?? "");
+  const name = String(formData.get("name") ?? "");
+  const description = String(formData.get("description") ?? "");
+
+  const result = await updateProduct(session.user.agencyId, productId, name, description);
   if (!result.ok) {
     redirect(`/agency/lines?error=${encodeURIComponent(result.error)}`);
   }
@@ -64,13 +97,67 @@ export default async function InsuranceLinesPage({
               <span className="text-xs text-gray-400">{line.category}</span>
             </div>
 
+            <details className="mt-1">
+              <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-800">Rename</summary>
+              <form action={renameLineAction} className="mt-2 flex items-center gap-2">
+                <input type="hidden" name="lineId" value={line.id} />
+                <input
+                  name="name"
+                  type="text"
+                  required
+                  defaultValue={line.name}
+                  className="block w-full rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="shrink-0 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white hover:bg-gray-800"
+                >
+                  Save
+                </button>
+              </form>
+              <p className="mt-1 text-xs text-gray-400">
+                Category ({line.category}) can&apos;t be changed here — it drives which forms and rules apply
+                to every product already under this line. Create a new line instead if it was mis-picked.
+              </p>
+            </details>
+
             <ul className="mt-2 divide-y divide-gray-100">
               {line.products.map((product) => (
                 <li key={product.id} className="py-2 text-sm text-gray-700">
-                  {product.name}
-                  {product.lifePolicyType && (
-                    <span className="ml-2 text-xs text-gray-400">({product.lifePolicyType})</span>
-                  )}
+                  <div className="flex items-center justify-between">
+                    <span>
+                      {product.name}
+                      {product.lifePolicyType && (
+                        <span className="ml-2 text-xs text-gray-400">({product.lifePolicyType})</span>
+                      )}
+                    </span>
+                  </div>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-800">Edit</summary>
+                    <form action={updateProductAction} className="mt-2 space-y-2">
+                      <input type="hidden" name="productId" value={product.id} />
+                      <input
+                        name="name"
+                        type="text"
+                        required
+                        defaultValue={product.name}
+                        className="block w-full rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
+                      />
+                      <input
+                        name="description"
+                        type="text"
+                        placeholder="Description (optional)"
+                        defaultValue={product.description ?? ""}
+                        className="block w-full rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white hover:bg-gray-800"
+                      >
+                        Save
+                      </button>
+                    </form>
+                  </details>
                 </li>
               ))}
               {line.products.length === 0 && (

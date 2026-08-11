@@ -2,16 +2,13 @@ import { getScopedPrisma } from "@/lib/tenant-db";
 
 // Record Locking (Section 10 phase 8 / Section 5's Record Locking
 // feature). Prevents two different people editing the same Lead/Policy at
-// once. Opening a record's edit page immediately checks it out — there's
-// no separate "view only" mode yet, since today only a lead's owner can
-// even reach its edit page (phase 7's ownership scoping), so there's no
-// uninvolved viewer to spare from taking a lock. That distinction becomes
-// meaningful once Manager/Head can open a teammate's record without
-// editing it (phase 12) — which is exactly what forceRelease() below is
-// for. It was originally deferred with the reasoning "there's no page
-// where a Manager/Head can reach another agent's lock yet," but phase 12
-// shipped that reachability and this function was never actually added —
-// caught in a full-app review as a stale deferral, not a still-current one.
+// once. checkOut()/checkIn() are called only when a caller explicitly
+// enters edit mode (the pages gate this behind a "?edit=1" state, added in
+// a full-app review after finding that every page unconditionally checked
+// a record out just to render it — even a Manager/Head merely opening a
+// teammate's record to look, silently locking the actual owner out of
+// their own record for up to 15 minutes. That contradicted Section 5's
+// "viewing a record never requires a lock — only entering edit mode does."
 
 const LOCK_TIMEOUT_MINUTES = 15;
 
@@ -34,7 +31,19 @@ export async function getLockStatus(
     where: { recordType, recordId },
     include: { holder: true },
   });
-  if (!lock || isStale(lock.lastActivityAt)) {
+  if (!lock) {
+    return { locked: false };
+  }
+  if (isStale(lock.lastActivityAt)) {
+    // Found in a full-app review: a stale lock was only ever treated as
+    // unlocked, never actually removed — it sat in the table until the
+    // next checkOut() happened to overwrite it. Now that plain viewing no
+    // longer calls checkOut() at all, nothing was guaranteed to ever
+    // overwrite it again, so a stale row could linger indefinitely.
+    // Deleting it here (a plain read call) is safe: the row is provably
+    // inert already (that's what "stale" means), so removing it changes
+    // nothing about who's actually allowed to check the record out next.
+    await scoped.recordLock.deleteMany({ where: { id: lock.id } });
     return { locked: false };
   }
   return {
@@ -79,6 +88,27 @@ export async function checkOut(agencyId: string, callerId: string, recordType: s
 export async function checkIn(agencyId: string, callerId: string, recordType: string, recordId: string): Promise<void> {
   const scoped = getScopedPrisma(agencyId);
   await scoped.recordLock.deleteMany({ where: { recordType, recordId, lockedBy: callerId } });
+}
+
+// Server-side write guard (found missing in a full-app review): every
+// mutating server action was disabling its own form in the UI whenever
+// lockedByOther, but none of them re-checked that on the server before
+// writing — so the lock had no actual enforcement effect against a direct
+// POST (a stale tab, a replay, or the "inert" attribute simply not
+// applying, e.g. a non-browser client). Every save/delete/activate/upload
+// action below calls this first and bails out if someone else genuinely
+// holds the lock. Deliberately keyed on "locked by a different, non-stale
+// holder" rather than "locked by me" — a caller whose own lock expired
+// mid-edit with nobody else claiming it should still be able to save; only
+// a real conflict with someone else blocks the write.
+export async function isLockedByOther(
+  agencyId: string,
+  callerId: string,
+  recordType: string,
+  recordId: string
+): Promise<boolean> {
+  const status = await getLockStatus(agencyId, callerId, recordType, recordId);
+  return status.locked && !status.heldBySelf;
 }
 
 // Manager/Head force-release override (Section 5: "a Manager can

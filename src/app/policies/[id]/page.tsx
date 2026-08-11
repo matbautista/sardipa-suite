@@ -11,7 +11,7 @@ import {
 } from "@/lib/policies";
 import { uploadDocument, listPolicyDocuments } from "@/lib/documents";
 import { listInsuranceLines } from "@/lib/insurance-lines";
-import { getLockStatus, checkOut, checkIn, forceRelease } from "@/lib/record-lock";
+import { getLockStatus, checkOut, checkIn, forceRelease, isLockedByOther } from "@/lib/record-lock";
 import { resolveAccessibleOwner } from "@/lib/team-access";
 
 const RECORD_TYPE = "policy";
@@ -51,11 +51,11 @@ export default async function PolicyDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; edit?: string }>;
 }) {
   const session = await requireAgencySession();
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, edit } = await searchParams;
 
   // Resolves which owner's policy this caller may act on (phase 12's
   // Manager/Head cross-visibility) — themselves, or (for Manager/Head) the
@@ -85,6 +85,9 @@ export default async function PolicyDetailPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const result = await updateDraftPolicy(session.user.agencyId, ownerId, session.user.id, id, readPolicyInput(formData));
     if (!result.ok) {
       redirect(`/policies/${id}?error=${encodeURIComponent(result.error)}`);
@@ -97,6 +100,9 @@ export default async function PolicyDetailPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const result = await activatePolicy(session.user.agencyId, ownerId, session.user.id, id);
     if (!result.ok) {
       redirect(`/policies/${id}?error=${encodeURIComponent(result.error)}`);
@@ -108,6 +114,9 @@ export default async function PolicyDetailPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const file = formData.get("document") as File;
     const docType = String(formData.get("docType") ?? "");
     const result = await uploadDocument(session.user.agencyId, id, ownerId, session.user.id, docType, file);
@@ -121,6 +130,9 @@ export default async function PolicyDetailPage({
     "use server";
     const session = await requireAgencySession();
     const ownerId = await resolveOwnerOrRedirect();
+    if (await isLockedByOther(session.user.agencyId, session.user.id, RECORD_TYPE, id)) {
+      redirect(`/policies/${id}?error=${encodeURIComponent("This record is being edited by someone else.")}`);
+    }
     const file = formData.get("document") as File;
     const uploadResult = await uploadDocument(session.user.agencyId, id, ownerId, session.user.id, "proof_of_payment", file);
     if (!uploadResult.ok) {
@@ -172,11 +184,16 @@ export default async function PolicyDetailPage({
     notFound();
   }
 
+  // Only "?edit=1" (the Edit button below) checks the record out — plain
+  // viewing never does (Section 5: "viewing a record never requires a
+  // lock — only entering edit mode does").
+  const editMode = edit === "1";
   const lockStatus = await getLockStatus(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   const lockedByOther = lockStatus.locked && !lockStatus.heldBySelf;
-  if (!lockedByOther) {
+  if (editMode && !lockedByOther) {
     await checkOut(session.user.agencyId, session.user.id, RECORD_TYPE, id);
   }
+  const formInert = lockedByOther || !editMode;
 
   const [lines, documents] = await Promise.all([
     listInsuranceLines(session.user.agencyId),
@@ -192,11 +209,18 @@ export default async function PolicyDetailPage({
         <h1 className="text-xl font-semibold text-gray-900">
           {policy.product.name} ({policy.line.name})
         </h1>
-        <form action={backToPoliciesAction}>
-          <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
-            {viewingOwnRecord ? "Back to my policies" : "Back to team policies"}
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          {!editMode && !lockedByOther && (
+            <Link href={`/policies/${id}?edit=1`} className="text-sm text-gray-500 underline hover:text-gray-800">
+              Edit
+            </Link>
+          )}
+          <form action={backToPoliciesAction}>
+            <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
+              {viewingOwnRecord ? "Back to my policies" : "Back to team policies"}
+            </button>
+          </form>
+        </div>
       </div>
 
       {!viewingOwnRecord && (
@@ -273,8 +297,8 @@ export default async function PolicyDetailPage({
         <>
           <form
             action={updatePolicyAction}
-            inert={lockedByOther}
-            className={`mt-8 space-y-4 ${lockedByOther ? "opacity-50" : ""}`}
+            inert={formInert}
+            className={`mt-8 space-y-4 ${formInert ? "opacity-50" : ""}`}
           >
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -365,7 +389,7 @@ export default async function PolicyDetailPage({
             </button>
           </form>
 
-          <form action={activatePolicyAction} inert={lockedByOther} className="mt-4">
+          <form action={activatePolicyAction} inert={formInert} className="mt-4">
             <button
               type="submit"
               disabled={!policy.proofOfPaymentDocId}
@@ -394,8 +418,8 @@ export default async function PolicyDetailPage({
       {canRenew && (
         <form
           action={renewalPaymentAction}
-          inert={lockedByOther}
-          className={`mt-8 space-y-3 rounded-md border border-gray-200 p-4 ${lockedByOther ? "opacity-50" : ""}`}
+          inert={formInert}
+          className={`mt-8 space-y-3 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
         >
           <h2 className="text-sm font-medium text-gray-700">Record Renewal / Payment</h2>
           <p className="text-xs text-gray-400">
@@ -441,8 +465,8 @@ export default async function PolicyDetailPage({
 
         <form
           action={uploadDocumentAction}
-          inert={lockedByOther}
-          className={`mt-3 space-y-3 ${lockedByOther ? "opacity-50" : ""}`}
+          inert={formInert}
+          className={`mt-3 space-y-3 ${formInert ? "opacity-50" : ""}`}
         >
           <div className="grid grid-cols-2 gap-4">
             <div>

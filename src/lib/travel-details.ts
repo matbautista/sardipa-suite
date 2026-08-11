@@ -1,4 +1,5 @@
 import { getScopedPrisma } from "@/lib/tenant-db";
+import { verifyOwnedPolicy } from "@/lib/policy-access";
 
 // Travel insurance requirement checklist (Section 10 phase 11 / Section
 // 11's Travel Insurance field list). Trip start/end dates aren't collected
@@ -17,16 +18,11 @@ export type TravelDetailsInput = {
   coverageType: string;
 };
 
-async function verifyOwnedPolicy(scoped: ReturnType<typeof getScopedPrisma>, ownerId: string, policyId: string) {
-  const policy = await scoped.policy.findUnique({ where: { id: policyId } });
-  return policy && policy.ownerId === ownerId ? policy : null;
-}
-
 // undefined = no such policy (caller should 404); null = policy exists but
 // no TravelDetail saved yet (caller should render an empty form, not 404)
 export async function getTravelDetails(agencyId: string, ownerId: string, policyId: string) {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "travel");
   if (!policy) return undefined;
   return scoped.travelDetail.findUnique({ where: { policyId } });
 }
@@ -38,7 +34,7 @@ export async function saveTravelDetails(
   input: TravelDetailsInput
 ): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "travel");
   if (!policy) {
     return { ok: false, error: "Policy not found." };
   }
@@ -72,7 +68,7 @@ export async function saveTravelDetails(
 
 export async function hasMinimumTravelInfo(agencyId: string, ownerId: string, policyId: string): Promise<boolean> {
   const scoped = getScopedPrisma(agencyId);
-  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId))) {
+  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId, "travel"))) {
     return false;
   }
   const detail = await scoped.travelDetail.findUnique({ where: { policyId } });

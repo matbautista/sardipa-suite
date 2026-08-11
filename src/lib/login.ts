@@ -46,16 +46,28 @@ export async function verifyCredentials(email: string, password: string): Promis
     return { ok: false, reason: "account_locked" };
   }
 
+  // Found in a full-app review: failedLoginAttempts was only ever reset to
+  // 0 on a successful login, never when a lockout's own window simply
+  // expired. Without this, once an account had been locked once, any
+  // single subsequent wrong password — even months later — instantly
+  // re-triggered another 15-minute lockout, since the stored count never
+  // dropped back below LOCKOUT_THRESHOLD on its own. A lockout whose
+  // window has passed (user.lockedUntil is set but no longer in the
+  // future) means the 15 minutes already ran out — that's exactly the
+  // signal to start counting a fresh set of attempts, not keep piling
+  // onto the old one.
+  const priorAttempts = user.lockedUntil && user.lockedUntil <= now ? 0 : user.failedLoginAttempts;
+
   const passwordValid = await bcrypt.compare(password, user.passwordHash);
 
   if (!passwordValid) {
-    const attempts = user.failedLoginAttempts + 1;
+    const attempts = priorAttempts + 1;
     const isNowLocked = attempts >= LOCKOUT_THRESHOLD;
     await prisma.user.update({
       where: { id: user.id },
       data: {
         failedLoginAttempts: attempts,
-        lockedUntil: isNowLocked ? new Date(now.getTime() + LOCKOUT_MINUTES * 60_000) : user.lockedUntil,
+        lockedUntil: isNowLocked ? new Date(now.getTime() + LOCKOUT_MINUTES * 60_000) : null,
       },
     });
     await logAttempt(

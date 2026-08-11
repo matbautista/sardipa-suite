@@ -1,4 +1,5 @@
 import { getScopedPrisma } from "@/lib/tenant-db";
+import { verifyOwnedPolicy } from "@/lib/policy-access";
 
 // Life insurance detail forms (Section 10 phase 10 / Section 11's Life
 // Insurance field list). LifeInsured/LifeOwner/Beneficiary/Person carry no
@@ -77,15 +78,10 @@ export function computeAge(birthdate: Date): number {
   return age;
 }
 
-async function verifyOwnedPolicy(scoped: ReturnType<typeof getScopedPrisma>, ownerId: string, policyId: string) {
-  const policy = await scoped.policy.findUnique({ where: { id: policyId } });
-  return policy && policy.ownerId === ownerId ? policy : null;
-}
-
 export async function getLifeDetails(agencyId: string, ownerId: string, policyId: string) {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await scoped.policy.findUnique({ where: { id: policyId }, include: { line: true } });
-  if (!policy || policy.ownerId !== ownerId || policy.line.category !== "life") return null;
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "life");
+  if (!policy) return null;
 
   const [insured, owner, beneficiaries] = await Promise.all([
     scoped.lifeInsured.findUnique({ where: { policyId }, include: { person: true } }),
@@ -155,7 +151,7 @@ export async function saveInsured(
   input: PersonInput
 ): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "life");
   if (!policy) {
     return { ok: false, error: "Policy not found." };
   }
@@ -184,7 +180,7 @@ export async function saveOwner(
   extra: OwnerExtraInput
 ): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "life");
   if (!policy) {
     return { ok: false, error: "Policy not found." };
   }
@@ -235,6 +231,21 @@ export async function saveOwner(
   return { ok: true };
 }
 
+// Up to 3 primary, up to 2 contingent (Section 6/11) — the schema's own
+// comment says this cap is "enforced at the application layer," but found
+// in a full-app review that neither save nor delete actually did. The UI
+// only ever submits one of these five fixed slot combos (BENEFICIARY_SLOTS
+// in policies/[id]/life/page.tsx), so this isn't reachable through normal
+// clicking, but nothing previously stopped a crafted request from writing
+// a 4th primary or 3rd contingent slot that would then silently count
+// toward hasMinimumLifeInfo below without ever showing up in the UI.
+const BENEFICIARY_SLOT_LIMITS: Record<string, number> = { primary: 3, contingent: 2 };
+
+function isValidBeneficiarySlot(beneficiaryType: string, slotNumber: number): boolean {
+  const limit = BENEFICIARY_SLOT_LIMITS[beneficiaryType];
+  return limit !== undefined && Number.isInteger(slotNumber) && slotNumber >= 1 && slotNumber <= limit;
+}
+
 export async function saveBeneficiary(
   agencyId: string,
   ownerId: string,
@@ -244,9 +255,12 @@ export async function saveBeneficiary(
   input: BeneficiaryInput
 ): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "life");
   if (!policy) {
     return { ok: false, error: "Policy not found." };
+  }
+  if (!isValidBeneficiarySlot(beneficiaryType, slotNumber)) {
+    return { ok: false, error: "Invalid beneficiary slot." };
   }
   if (!input.firstName.trim() || !input.lastName.trim()) {
     return { ok: false, error: "First and last name are required." };
@@ -283,9 +297,12 @@ export async function deleteBeneficiary(
   slotNumber: number
 ): Promise<ActionResult> {
   const scoped = getScopedPrisma(agencyId);
-  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId);
+  const policy = await verifyOwnedPolicy(scoped, ownerId, policyId, "life");
   if (!policy) {
     return { ok: false, error: "Policy not found." };
+  }
+  if (!isValidBeneficiarySlot(beneficiaryType, slotNumber)) {
+    return { ok: false, error: "Invalid beneficiary slot." };
   }
 
   await scoped.beneficiary.deleteMany({ where: { policyId, beneficiaryType, slotNumber } });
@@ -299,7 +316,7 @@ export async function deleteBeneficiary(
 // three sub-records exist, not that every optional field is filled in.
 export async function hasMinimumLifeInfo(agencyId: string, ownerId: string, policyId: string): Promise<boolean> {
   const scoped = getScopedPrisma(agencyId);
-  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId))) {
+  if (!(await verifyOwnedPolicy(scoped, ownerId, policyId, "life"))) {
     return false;
   }
   const [insured, owner, primaryBeneficiaryCount] = await Promise.all([

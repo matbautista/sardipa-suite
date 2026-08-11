@@ -116,11 +116,13 @@ export async function resetAgencyUserPassword(agencyId: string, targetUserId: st
   return { ok: true, temporaryPassword };
 }
 
+type SetActiveResult = { ok: true; warning: string | null } | { ok: false; error: string };
+
 export async function setAgencyUserActive(
   agencyId: string,
   targetUserId: string,
   isActive: boolean
-): Promise<ActionResult> {
+): Promise<SetActiveResult> {
   const scoped = getScopedPrisma(agencyId);
   const target = await scoped.user.findUnique({ where: { id: targetUserId } });
   if (!target || (target.role !== "manager" && target.role !== "agent")) {
@@ -132,7 +134,29 @@ export async function setAgencyUserActive(
     data: { userId: targetUserId, action: isActive ? "user_reactivated" : "user_deactivated", note: null },
   });
 
-  return { ok: true };
+  // Found in a full-app review: deactivation had no reassignment path or
+  // even a warning for the person's open leads/policies, despite Section
+  // 5's Deactivation bullet requiring it ("a Manager/Agency Head reassigns
+  // their open leads/policies to someone active"). Reassigning is a
+  // judgment call (who should get them?), not something safe to do
+  // silently on the Head's behalf — this surfaces it as an explicit
+  // prompt instead, pointing at the reassignment controls team/leads and
+  // team/policies already have (the latter added in this same review).
+  let warning: string | null = null;
+  if (!isActive) {
+    const [openLeadCount, openPolicyCount] = await Promise.all([
+      scoped.lead.count({ where: { ownerId: targetUserId, status: { notIn: ["won", "lost"] } } }),
+      scoped.policy.count({ where: { ownerId: targetUserId, status: { notIn: ["cancelled", "completed"] } } }),
+    ]);
+    if (openLeadCount > 0 || openPolicyCount > 0) {
+      const parts = [];
+      if (openLeadCount > 0) parts.push(`${openLeadCount} open lead${openLeadCount === 1 ? "" : "s"}`);
+      if (openPolicyCount > 0) parts.push(`${openPolicyCount} open polic${openPolicyCount === 1 ? "y" : "ies"}`);
+      warning = `${target.name} still has ${parts.join(" and ")} — reassign them from Team Leads / Team Policies so they stay with someone active.`;
+    }
+  }
+
+  return { ok: true, warning };
 }
 
 export async function reassignAgentManager(

@@ -35,26 +35,53 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
 
 async function checkStorageNowAction() {
   "use server";
-  await requireSuperAdminSession();
+  const session = await requireSuperAdminSession();
   await checkAllStorageLocations();
+  // Found in a full-app review: every other mutating action in this app
+  // writes to ActivityLog; these two self-healing-surface actions
+  // (Section 9) didn't. agencyId: null since this is host-level
+  // infrastructure, same as storage-locations.ts's own writes.
+  await prisma.activityLog.create({
+    data: { userId: session.user.id, agencyId: null, action: "storage_check_run", note: null },
+  });
   redirect(`/admin/health?success=${encodeURIComponent("Storage check complete.")}`);
 }
 
 async function resolveAlertAction(formData: FormData) {
   "use server";
-  await requireSuperAdminSession();
+  const session = await requireSuperAdminSession();
   const alertId = String(formData.get("alertId") ?? "");
+  // Found in a full-app review: this previously updated straight away with
+  // no existence check — a stale alertId (e.g. a double-submit, or the
+  // alert already resolved from another tab) threw an unhandled Prisma
+  // error instead of a friendly redirect.
+  const alert = await prisma.systemAlert.findUnique({ where: { id: alertId } });
+  if (!alert) {
+    redirect(`/admin/health?error=${encodeURIComponent("That alert no longer exists — it may already be resolved.")}`);
+  }
   await prisma.systemAlert.update({ where: { id: alertId }, data: { resolvedAt: new Date() } });
+  // agencyId: alert.agencyId (not necessarily null) — an agency-scoped
+  // alert (e.g. email intake failure) resolved by the Super Admin should
+  // still show up on that agency's own activity log, per Section 9's "the
+  // Agency Head (it's their mailbox) and Super Admin" both caring about it.
+  await prisma.activityLog.create({
+    data: {
+      userId: session.user.id,
+      agencyId: alert.agencyId,
+      action: "alert_resolved",
+      note: `${ALERT_TYPE_LABELS[alert.type] ?? alert.type}: ${alert.message}`,
+    },
+  });
   redirect(`/admin/health?success=${encodeURIComponent("Alert marked resolved.")}`);
 }
 
 export default async function SystemHealthPage({
   searchParams,
 }: {
-  searchParams: Promise<{ success?: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   await requireSuperAdminSession();
-  const { success } = await searchParams;
+  const { success, error } = await searchParams;
 
   const [storageLocations, restartEvents, activeAlerts, agencies] = await Promise.all([
     prisma.storageLocation.findMany({ orderBy: { addedAt: "asc" } }),
@@ -92,6 +119,7 @@ export default async function SystemHealthPage({
       </div>
 
       {success && <p className="mt-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{success}</p>}
+      {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       <div className="mt-8">
         <h2 className="text-sm font-medium text-gray-700">App uptime</h2>

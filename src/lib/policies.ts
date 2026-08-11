@@ -240,7 +240,14 @@ export async function activatePolicy(
 // Reactivating a lapsed/grace_period policy (Section 5's "Recording a
 // Renewal / Payment") — the caller is expected to have already uploaded a
 // new Proof of Payment document via uploadDocument() before calling this,
-// which is what actually satisfies step 1 of that section.
+// which is what actually satisfies step 1 of that section. That
+// expectation is now also verified below, not just trusted (found in a
+// full-app review: as written before, calling this directly with no fresh
+// upload would reactivate the policy on the strength of a code comment
+// alone) — mirrors how activatePolicy() re-checks proofOfPaymentDocId
+// itself rather than trusting its own caller.
+const RENEWAL_DOCUMENT_FRESHNESS_MS = 10 * 60 * 1000;
+
 export async function recordRenewal(
   agencyId: string,
   ownerId: string,
@@ -254,6 +261,17 @@ export async function recordRenewal(
   }
   if (policy.status !== "lapsed" && policy.status !== "grace_period") {
     return { ok: false, error: "Only a lapsed or grace-period policy can be renewed." };
+  }
+  if (!policy.proofOfPaymentDocId) {
+    return { ok: false, error: "Upload a new Proof of Payment document before renewing." };
+  }
+  const proofOfPayment = await scoped.document.findUnique({ where: { id: policy.proofOfPaymentDocId } });
+  // uploadDocument() always repoints proofOfPaymentDocId at whichever
+  // proof_of_payment document was uploaded most recently, so a fresh
+  // enough uploadedAt here means this really is a new document from this
+  // renewal, not a stale pointer left over from the original Activate.
+  if (!proofOfPayment || Date.now() - proofOfPayment.uploadedAt.getTime() > RENEWAL_DOCUMENT_FRESHNESS_MS) {
+    return { ok: false, error: "Upload a new Proof of Payment document before renewing." };
   }
 
   const oneYearForward = (from: Date) => {
@@ -284,6 +302,42 @@ export async function getPolicyOwnerId(agencyId: string, policyId: string): Prom
   const scoped = getScopedPrisma(agencyId);
   const policy = await scoped.policy.findUnique({ where: { id: policyId } });
   return policy?.ownerId;
+}
+
+// Found in a full-app review: this didn't exist at all, but Section 5's
+// Deactivation bullet requires it ("a Manager/Agency Head reassigns their
+// open leads/policies to someone active") — team/policies/page.tsx's own
+// header comment previously justified having no reassignment control by
+// citing Section 3's permissions table, which only calls out lead
+// reassignment, but that table is about day-to-day pipeline management,
+// not this deactivation-cleanup requirement a few sections later. Same
+// shape as leads.ts's reassignLead: callerOwnerIds (already resolved by
+// the caller via getTeamMemberIds()) proves both the policy's *current*
+// owner and newOwnerId are within the caller's own team scope — a Manager
+// can't use this to pull a policy from, or push one into, another team.
+export async function reassignPolicy(
+  agencyId: string,
+  actorId: string,
+  callerOwnerIds: string[],
+  policyId: string,
+  newOwnerId: string
+): Promise<ActionResult> {
+  if (!callerOwnerIds.includes(newOwnerId)) {
+    return { ok: false, error: "Choose a valid team member to reassign to." };
+  }
+  const scoped = getScopedPrisma(agencyId);
+  const policy = await scoped.policy.findUnique({ where: { id: policyId } });
+  if (!policy) {
+    return { ok: false, error: "Policy not found." };
+  }
+  if (!callerOwnerIds.includes(policy.ownerId)) {
+    return { ok: false, error: "That policy isn't in your team." };
+  }
+  await scoped.policy.update({ where: { id: policyId }, data: { ownerId: newOwnerId } });
+  await scoped.activityLog.create({
+    data: { userId: actorId, policyId, action: "policy_reassigned", note: "Reassigned to a different agent" },
+  });
+  return { ok: true };
 }
 
 export type TeamPolicyFilters = { status?: string; ownerId?: string };
