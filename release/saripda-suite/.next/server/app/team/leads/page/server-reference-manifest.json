@@ -1,0 +1,27 @@
+{
+  "node": {
+    "40231e717edb59f22903b9769d37df7073b784d19b": {
+      "workers": {
+        "app/team/leads/page": {
+          "moduleId": 60046,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/team/leads/page.tsx"
+    },
+    "40cf06bcf65d000c668b82cd69722864edf8e9b14e": {
+      "workers": {
+        "app/team/leads/page": {
+          "moduleId": 60046,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/team/leads/page.tsx"
+    }
+  },
+  "edge": {}
+}

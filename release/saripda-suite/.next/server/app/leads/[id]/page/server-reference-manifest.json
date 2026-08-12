@@ -1,0 +1,60 @@
+{
+  "node": {
+    "40214a9de350fb83639bb94f8463dd79e6f3178415": {
+      "workers": {
+        "app/leads/[id]/page": {
+          "moduleId": 89248,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/leads/[id]/page.tsx"
+    },
+    "405e8125ada9e71af179de6ad266ecdc681e5c672d": {
+      "workers": {
+        "app/leads/[id]/page": {
+          "moduleId": 89248,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_3",
+      "filename": "src/app/leads/[id]/page.tsx"
+    },
+    "40b84849c32de49d94c3d39a0a06f17ea4d791d3f9": {
+      "workers": {
+        "app/leads/[id]/page": {
+          "moduleId": 89248,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_4",
+      "filename": "src/app/leads/[id]/page.tsx"
+    },
+    "40d01944299d330dd2e0e3c1a074e225b4842d0a58": {
+      "workers": {
+        "app/leads/[id]/page": {
+          "moduleId": 89248,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_2",
+      "filename": "src/app/leads/[id]/page.tsx"
+    },
+    "60e64f96ad6b158ac6d29786bd3ff893e4f6ae0beb": {
+      "workers": {
+        "app/leads/[id]/page": {
+          "moduleId": 89248,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/leads/[id]/page.tsx"
+    }
+  },
+  "edge": {}
+}

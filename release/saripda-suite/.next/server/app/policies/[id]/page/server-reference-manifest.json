@@ -1,0 +1,82 @@
+{
+  "node": {
+    "40513648c3307e655e3dfb81c7084946c08016b21f": {
+      "workers": {
+        "app/policies/[id]/page": {
+          "moduleId": 96414,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_5",
+      "filename": "src/app/policies/[id]/page.tsx"
+    },
+    "406428259f4783612e8592399f8d89426464ac9066": {
+      "workers": {
+        "app/policies/[id]/page": {
+          "moduleId": 96414,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/policies/[id]/page.tsx"
+    },
+    "40bbb7f572f6314608f83d229653811d052d0c5639": {
+      "workers": {
+        "app/policies/[id]/page": {
+          "moduleId": 96414,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_2",
+      "filename": "src/app/policies/[id]/page.tsx"
+    },
+    "40da37a04e6f8d24e0464bef2edc6e0785fb5ebce4": {
+      "workers": {
+        "app/policies/[id]/page": {
+          "moduleId": 96414,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_6",
+      "filename": "src/app/policies/[id]/page.tsx"
+    },
+    "60dc2d8a078e46324a7786d506387ff809f5e161f7": {
+      "workers": {
+        "app/policies/[id]/page": {
+          "moduleId": 96414,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_3",
+      "filename": "src/app/policies/[id]/page.tsx"
+    },
+    "60df40abe5e1162d5830e6c6391df3c83d42ac5a9b": {
+      "workers": {
+        "app/policies/[id]/page": {
+          "moduleId": 96414,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_4",
+      "filename": "src/app/policies/[id]/page.tsx"
+    },
+    "60f995a573fbb7f9ae6221e1b7f855d6e5945c50dc": {
+      "workers": {
+        "app/policies/[id]/page": {
+          "moduleId": 96414,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/policies/[id]/page.tsx"
+    }
+  },
+  "edge": {}
+}

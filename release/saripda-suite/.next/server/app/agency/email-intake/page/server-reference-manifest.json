@@ -1,0 +1,27 @@
+{
+  "node": {
+    "00aa2a1a2237d726b32bf1811f01a31c9018a95f93": {
+      "workers": {
+        "app/agency/email-intake/page": {
+          "moduleId": 56479,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/agency/email-intake/page.tsx"
+    },
+    "409e99ae908bd360359ef8341fe26a156a86598878": {
+      "workers": {
+        "app/agency/email-intake/page": {
+          "moduleId": 56479,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/agency/email-intake/page.tsx"
+    }
+  },
+  "edge": {}
+}

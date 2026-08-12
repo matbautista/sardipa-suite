@@ -1,0 +1,16 @@
+{
+  "node": {
+    "6059144f5b17fb31ec10d227e35fabb282f2a9388b": {
+      "workers": {
+        "app/admin/agencies/page": {
+          "moduleId": 63785,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "createAgencyFormAction",
+      "filename": "src/app/admin/agencies/actions.ts"
+    }
+  },
+  "edge": {}
+}

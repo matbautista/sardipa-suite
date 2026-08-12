@@ -1,0 +1,38 @@
+{
+  "node": {
+    "4059132be88f9e863515e88f211046afcb60d94032": {
+      "workers": {
+        "app/policies/[id]/property/page": {
+          "moduleId": 57791,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/policies/[id]/property/page.tsx"
+    },
+    "406a06309985efcfe2ffc4462ce923d31e74e32855": {
+      "workers": {
+        "app/policies/[id]/property/page": {
+          "moduleId": 57791,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/policies/[id]/property/page.tsx"
+    },
+    "608f4b82c44a9f967535db02e8e78ae71b2e0d6633": {
+      "workers": {
+        "app/policies/[id]/property/page": {
+          "moduleId": 57791,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_2",
+      "filename": "src/app/policies/[id]/property/page.tsx"
+    }
+  },
+  "edge": {}
+}

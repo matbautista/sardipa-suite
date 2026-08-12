@@ -1,0 +1,27 @@
+{
+  "node": {
+    "00db3e0e4ff3a7c470861a5844d65ccc48530bee1d": {
+      "workers": {
+        "app/admin/health/page": {
+          "moduleId": 27652,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/admin/health/page.tsx"
+    },
+    "40bf2217a02c182437572bfbdf18bab01ee92f146f": {
+      "workers": {
+        "app/admin/health/page": {
+          "moduleId": 27652,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/admin/health/page.tsx"
+    }
+  },
+  "edge": {}
+}

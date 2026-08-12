@@ -1,0 +1,16 @@
+{
+  "node": {
+    "407e8a773b0a28f857ea6fe98e8ce30c298e96290d": {
+      "workers": {
+        "app/change-password/page": {
+          "moduleId": 19373,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/change-password/page.tsx"
+    }
+  },
+  "edge": {}
+}

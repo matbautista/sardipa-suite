@@ -1,0 +1,71 @@
+{
+  "node": {
+    "40144959cac5c5012bfb79e6851f8edd437d825f68": {
+      "workers": {
+        "app/policies/[id]/life/page": {
+          "moduleId": 35743,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/policies/[id]/life/page.tsx"
+    },
+    "40fbabbb5023f2d1f78dbd375399402874e612eef4": {
+      "workers": {
+        "app/policies/[id]/life/page": {
+          "moduleId": 35743,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/policies/[id]/life/page.tsx"
+    },
+    "60225ccd1696f6cb4a3f0727a358726f46ec67312f": {
+      "workers": {
+        "app/policies/[id]/life/page": {
+          "moduleId": 35743,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_4",
+      "filename": "src/app/policies/[id]/life/page.tsx"
+    },
+    "603f72c9580a50f7d1f16d34506b6fd0d3f8cb06da": {
+      "workers": {
+        "app/policies/[id]/life/page": {
+          "moduleId": 35743,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_2",
+      "filename": "src/app/policies/[id]/life/page.tsx"
+    },
+    "605d1bf979fa7caebe87e277f6fd293b62597e6797": {
+      "workers": {
+        "app/policies/[id]/life/page": {
+          "moduleId": 35743,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_3",
+      "filename": "src/app/policies/[id]/life/page.tsx"
+    },
+    "609bea508b694593d23b0a3e29239e5f62eecff828": {
+      "workers": {
+        "app/policies/[id]/life/page": {
+          "moduleId": 35743,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_5",
+      "filename": "src/app/policies/[id]/life/page.tsx"
+    }
+  },
+  "edge": {}
+}

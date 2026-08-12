@@ -1,0 +1,16 @@
+{
+  "node": {
+    "60db731df1fda61d65d75879201cc535af5fafcd0b": {
+      "workers": {
+        "app/policies/new/page": {
+          "moduleId": 94987,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/policies/new/page.tsx"
+    }
+  },
+  "edge": {}
+}

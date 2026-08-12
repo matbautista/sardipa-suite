@@ -1,0 +1,120 @@
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+
+// Login security baseline (Section 5 of the plan): 10-character minimum is
+// enforced wherever passwords are *set*, not here; lockout after 5
+// consecutive failed attempts, for 15 minutes, is enforced here.
+const LOCKOUT_THRESHOLD = 5;
+const LOCKOUT_MINUTES = 15;
+
+export type LoginResult =
+  | {
+      ok: true;
+      user: {
+        id: string;
+        agencyId: string | null;
+        role: string;
+        name: string;
+        email: string;
+        mustChangePassword: boolean;
+      };
+    }
+  | { ok: false; reason: "invalid_credentials" | "account_inactive" | "account_locked" };
+
+/**
+ * Verifies email/password against the User table, applying the account
+ * lockout rule and writing every attempt (success or failure) to
+ * ActivityLog — this is the one place login is actually checked, so
+ * NextAuth's Credentials provider is a thin wrapper around it.
+ */
+export async function verifyCredentials(email: string, password: string): Promise<LoginResult> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+  if (!user) {
+    // No account to log against — nothing to record.
+    return { ok: false, reason: "invalid_credentials" };
+  }
+
+  if (!user.isActive) {
+    return { ok: false, reason: "account_inactive" };
+  }
+
+  const now = new Date();
+  if (user.lockedUntil && user.lockedUntil > now) {
+    await logAttempt(user.id, user.agencyId, "login_locked_out", "Login attempted while account is locked");
+    return { ok: false, reason: "account_locked" };
+  }
+
+  // Found in a full-app review: failedLoginAttempts was only ever reset to
+  // 0 on a successful login, never when a lockout's own window simply
+  // expired. Without this, once an account had been locked once, any
+  // single subsequent wrong password — even months later — instantly
+  // re-triggered another 15-minute lockout, since the stored count never
+  // dropped back below LOCKOUT_THRESHOLD on its own. A lockout whose
+  // window has passed (user.lockedUntil is set but no longer in the
+  // future) means the 15 minutes already ran out — that's exactly the
+  // signal to start counting a fresh set of attempts, not keep piling
+  // onto the old one.
+  const priorAttempts = user.lockedUntil && user.lockedUntil <= now ? 0 : user.failedLoginAttempts;
+
+  const passwordValid = await bcrypt.compare(password, user.passwordHash);
+
+  if (!passwordValid) {
+    const attempts = priorAttempts + 1;
+    const isNowLocked = attempts >= LOCKOUT_THRESHOLD;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: attempts,
+        lockedUntil: isNowLocked ? new Date(now.getTime() + LOCKOUT_MINUTES * 60_000) : null,
+      },
+    });
+    await logAttempt(
+      user.id,
+      user.agencyId,
+      isNowLocked ? "login_failed_lockout_triggered" : "login_failed",
+      `Failed login attempt ${attempts}/${LOCKOUT_THRESHOLD}`
+    );
+    return { ok: false, reason: "invalid_credentials" };
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { failedLoginAttempts: 0, lockedUntil: null },
+  });
+  await logAttempt(user.id, user.agencyId, "login_success", null);
+
+  return {
+    ok: true,
+    user: {
+      id: user.id,
+      agencyId: user.agencyId,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      mustChangePassword: user.mustChangePassword,
+    },
+  };
+}
+
+function logAttempt(userId: string, agencyId: string | null, action: string, note: string | null) {
+  return prisma.activityLog.create({
+    data: { userId, agencyId, action, note },
+  });
+}
+
+// isActive was previously only ever checked at login (above) — the JWT
+// session carries no live link back to the User row, so a deactivated
+// user's already-issued session kept working for the rest of its
+// lifetime (default 30 days) regardless. Found in a full-app review;
+// src/proxy.ts now calls this on every authenticated request to close
+// that gap. A plain indexed primary-key lookup — cheap enough for this
+// app's small-office-LAN scale (same tolerance the polling model in
+// Section 5 already assumes) — and deliberately never cached, unlike
+// isSetupComplete()'s one-way true flip, since isActive can flip back
+// and forth at any time.
+export async function isUserActive(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { isActive: true } });
+  return user?.isActive ?? false;
+}

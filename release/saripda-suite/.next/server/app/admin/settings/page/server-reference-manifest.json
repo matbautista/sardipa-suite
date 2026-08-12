@@ -1,0 +1,27 @@
+{
+  "node": {
+    "402feb299f13847632be9b29c3073e4a73cb1c119f": {
+      "workers": {
+        "app/admin/settings/page": {
+          "moduleId": 42875,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/admin/settings/page.tsx"
+    },
+    "40543da9e79128f2a0e0cf367cd8e3172abca8fd8b": {
+      "workers": {
+        "app/admin/settings/page": {
+          "moduleId": 42875,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/admin/settings/page.tsx"
+    }
+  },
+  "edge": {}
+}

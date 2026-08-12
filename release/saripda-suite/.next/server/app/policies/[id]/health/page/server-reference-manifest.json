@@ -1,0 +1,38 @@
+{
+  "node": {
+    "407f9c0a50db939d0366c5bbe0ce021993e7a04a35": {
+      "workers": {
+        "app/policies/[id]/health/page": {
+          "moduleId": 50392,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/policies/[id]/health/page.tsx"
+    },
+    "4085b2cb519877f937a7f1edfd3c382110cd13e7bf": {
+      "workers": {
+        "app/policies/[id]/health/page": {
+          "moduleId": 50392,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/policies/[id]/health/page.tsx"
+    },
+    "604e3f7debfffbf959ba2924f338351b991b7be1b6": {
+      "workers": {
+        "app/policies/[id]/health/page": {
+          "moduleId": 50392,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_2",
+      "filename": "src/app/policies/[id]/health/page.tsx"
+    }
+  },
+  "edge": {}
+}

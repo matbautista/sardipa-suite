@@ -1,0 +1,16 @@
+{
+  "node": {
+    "407be8d878491fa4c0d10ed600a814f2cbe034c287": {
+      "workers": {
+        "app/leads/page": {
+          "moduleId": 84944,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/leads/page.tsx"
+    }
+  },
+  "edge": {}
+}

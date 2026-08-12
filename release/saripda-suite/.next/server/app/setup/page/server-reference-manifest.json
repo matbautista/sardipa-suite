@@ -1,0 +1,27 @@
+{
+  "node": {
+    "4087ee2e460e36146a2bb53fa66250565b58806865": {
+      "workers": {
+        "app/setup/page": {
+          "moduleId": 86836,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/setup/page.tsx"
+    },
+    "40f09fe8e0e0d0adb96aff3b8248cef99bdd02a1a7": {
+      "workers": {
+        "app/setup/page": {
+          "moduleId": 86836,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_1",
+      "filename": "src/app/setup/page.tsx"
+    }
+  },
+  "edge": {}
+}

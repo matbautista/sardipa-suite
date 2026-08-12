@@ -1,0 +1,3 @@
+{
+  "/policies/[id]/health/page": "app/policies/[id]/health/page.js"
+}

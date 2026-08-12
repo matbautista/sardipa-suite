@@ -1,0 +1,16 @@
+{
+  "node": {
+    "40a3d12ec276d5abb35f3f89b84136e0d9c6756baa": {
+      "workers": {
+        "app/team/policies/page": {
+          "moduleId": 45940,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "$$RSC_SERVER_ACTION_0",
+      "filename": "src/app/team/policies/page.tsx"
+    }
+  },
+  "edge": {}
+}
