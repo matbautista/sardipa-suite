@@ -3,12 +3,19 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Classic-theme fallback (src/lib/themes.ts) — the root layout normally
+     overrides these inline per agency; this just covers any render path
+     that somehow skips it, rather than leaving buttons with no color. */
+  --color-primary: #111827;
+  --color-primary-hover: #1f2937;
+  --color-primary-foreground: #ffffff;
+  --color-primary-gradient: none;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: Candara, "Segoe UI", Calibri, Arial, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -22,5 +29,21 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* The site's one themed element (src/lib/themes.ts / src/app/agency/settings)
+   — every primary action button. Solid themes leave --color-primary-gradient
+   at "none" so background-image is a no-op; only Markey's Theme sets a real
+   gradient. Hover intentionally drops to a flat color even under the
+   gradient theme, rather than a second gradient. */
+@utility btn-primary {
+  background-color: var(--color-primary);
+  background-image: var(--color-primary-gradient);
+  color: var(--color-primary-foreground);
+
+  &:hover {
+    background-color: var(--color-primary-hover);
+    background-image: none;
+  }
 }

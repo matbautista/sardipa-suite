@@ -9,7 +9,7 @@ export default async function AgenciesPage() {
   const agencies = await listAgenciesWithHeads();
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Agencies</h1>
         <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
@@ -40,7 +40,7 @@ export default async function AgenciesPage() {
           Creates the agency and its first Agency Head account together — the Head then
           creates accounts for their own Managers/Agents (Section 5).
         </p>
-        <div className="mt-4">
+        <div className="mt-4 rounded-md border border-gray-200 p-4">
           <CreateAgencyForm />
         </div>
       </div>

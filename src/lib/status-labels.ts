@@ -66,4 +66,6 @@ export const ACTIVITY_ACTION_LABELS: Record<string, string> = {
   policy_entered_grace_period: "Policy entered grace period",
   policy_completed: "Travel policy completed",
   policy_reassigned: "Policy reassigned",
+  insurance_line_deleted: "Insurance line deleted",
+  product_deleted: "Product deleted",
 };

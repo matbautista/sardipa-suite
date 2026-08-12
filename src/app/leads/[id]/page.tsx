@@ -173,12 +173,11 @@ export default async function LeadDetailPage({
   }
   const formInert = lockedByOther || !editMode;
 
-  const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
   const existingPolicy =
     lead.status === "won" ? await getPolicyForLead(session.user.agencyId, accessibleOwnerId, id) : null;
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">{lead.name}</h1>
         <div className="flex items-center gap-4">
@@ -240,7 +239,7 @@ export default async function LeadDetailPage({
       <form
         action={updateLeadAction}
         inert={formInert}
-        className={`mt-8 space-y-4 ${formInert ? "opacity-50" : ""}`}
+        className={`mt-8 space-y-4 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
       >
         <div>
           <label className="block text-sm font-medium text-gray-700">Name</label>
@@ -249,7 +248,7 @@ export default async function LeadDetailPage({
             type="text"
             required
             defaultValue={lead.name}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -259,7 +258,7 @@ export default async function LeadDetailPage({
               name="phone"
               type="text"
               defaultValue={lead.phone ?? ""}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
           <div>
@@ -268,7 +267,7 @@ export default async function LeadDetailPage({
               name="email"
               type="email"
               defaultValue={lead.email ?? ""}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
         </div>
@@ -278,7 +277,7 @@ export default async function LeadDetailPage({
             name="source"
             type="text"
             defaultValue={lead.source}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -286,7 +285,7 @@ export default async function LeadDetailPage({
           <select
             name="status"
             defaultValue={lead.status}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           >
             {STATUSES.map((status) => (
               <option key={status} value={status}>
@@ -302,7 +301,7 @@ export default async function LeadDetailPage({
               key={lead.lineId ?? "none"}
               name="lineId"
               defaultValue={lead.lineId ?? ""}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             >
               <option value="">— none yet —</option>
               {lines.map((line) => (
@@ -318,14 +317,20 @@ export default async function LeadDetailPage({
               key={lead.productId ?? "none"}
               name="productId"
               defaultValue={lead.productId ?? ""}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             >
               <option value="">— none yet —</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name} ({product.lineName})
-                </option>
-              ))}
+              {lines
+                .filter((line) => line.products.length > 0)
+                .map((line) => (
+                  <optgroup key={line.id} label={line.name}>
+                    {line.products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
             </select>
           </div>
         </div>
@@ -338,7 +343,7 @@ export default async function LeadDetailPage({
             name="nextFollowUpDate"
             type="date"
             defaultValue={toDateInputValue(lead.nextFollowUpDate)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -352,7 +357,7 @@ export default async function LeadDetailPage({
         </div>
         <button
           type="submit"
-          className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
         >
           Save changes
         </button>
@@ -360,7 +365,10 @@ export default async function LeadDetailPage({
 
       {!lockedByOther && (
         <form action={deleteLeadAction} className="mt-4">
-          <button type="submit" className="text-sm text-red-600 underline hover:text-red-800">
+          <button
+            type="submit"
+            className="inline-block min-w-[110px] rounded-md bg-red-600 px-2.5 py-1 text-center text-xs font-medium text-white hover:bg-red-700"
+          >
             Delete this lead
           </button>
         </form>

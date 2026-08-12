@@ -3,6 +3,7 @@ import { simpleParser } from "mailparser";
 import { prisma } from "@/lib/prisma";
 import { getScopedPrisma } from "@/lib/tenant-db";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
+import { getSystemActorId } from "@/lib/system-actor";
 
 // Website Inquiry Intake (Section 10 phase 14 / Section 5's "Website
 // Inquiry Intake (Client-Facing Site -> Leads)"). The client-facing site
@@ -184,12 +185,22 @@ async function createLeadFromInquiry(agencyId: string, subject: string, bodyText
   // forgotten" guarantee for any future edit to this function.
   const scoped = getScopedPrisma(agencyId);
 
+  // Every branch below writes an ActivityLog entry, attributed to the same
+  // reserved system actor the renewal job uses — found in a full-app QA
+  // pass that this whole function created Leads with no audit trail at
+  // all, contradicting the Activity Log's own "every create ... on a Lead
+  // ... is written to ActivityLog" claim (Section 5), which (per
+  // renewal-job.ts's comment on the same point) doesn't carve out an
+  // exception for automated creates any more than it does for automated
+  // updates.
+  const systemActorId = await getSystemActorId();
+
   if (!parsed.matchedFormat) {
     // Point 5: still create a Lead rather than dropping it — flagged for
     // review, raw body kept as the only record of what came in. Lead.name
     // is required (schema), and there's no name to use, so the subject
     // line (or a fallback) stands in.
-    await scoped.lead.create({
+    const lead = await scoped.lead.create({
       data: {
         agencyId,
         ownerId: null,
@@ -197,6 +208,14 @@ async function createLeadFromInquiry(agencyId: string, subject: string, bodyText
         source: "Website Inquiry (needs review)",
         needsReview: true,
         notes: bodyText.slice(0, 5000) || null,
+      },
+    });
+    await scoped.activityLog.create({
+      data: {
+        userId: systemActorId,
+        leadId: lead.id,
+        action: "lead_created",
+        note: "Created from an unparsed website inquiry email — flagged for review",
       },
     });
     return;
@@ -218,7 +237,7 @@ async function createLeadFromInquiry(agencyId: string, subject: string, bodyText
   // treatment as an unparseable email (point 7).
   const needsReview = lineId === null;
 
-  await scoped.lead.create({
+  const lead = await scoped.lead.create({
     data: {
       agencyId,
       ownerId: null,
@@ -229,6 +248,16 @@ async function createLeadFromInquiry(agencyId: string, subject: string, bodyText
       needsReview,
       lineId,
       notes: parsed.message,
+    },
+  });
+  await scoped.activityLog.create({
+    data: {
+      userId: systemActorId,
+      leadId: lead.id,
+      action: "lead_created",
+      note: needsReview
+        ? "Created from a website inquiry email — flagged for review (insurance line not matched)"
+        : "Created from a website inquiry email",
     },
   });
 }

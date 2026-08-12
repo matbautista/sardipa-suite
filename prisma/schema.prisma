@@ -67,6 +67,12 @@ model Agency {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now())
+  theme     String   @default("classic")
+  // Accent-color theme for this agency's whole install (buttons, etc.) —
+  // one of the ids in src/lib/themes.ts, applied via CSS variables set on
+  // <html> in the root layout. Agency Head only (src/app/agency/settings);
+  // Super Admin's own host-level pages sit outside any agency and always
+  // render the neutral "classic" default instead.
 
   users          User[]
   insuranceLines InsuranceLine[]

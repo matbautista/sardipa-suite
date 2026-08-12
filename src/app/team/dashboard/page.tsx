@@ -43,7 +43,7 @@ export default async function TeamDashboardPage({
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">
           {session.user.role === "head" ? "Agency Dashboard" : "Team Dashboard"}
@@ -61,14 +61,14 @@ export default async function TeamDashboardPage({
         </div>
       </div>
 
-      <form className="mt-6 flex flex-wrap items-end gap-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3" method="get">
+      <form className="mt-6 flex flex-wrap items-end gap-4 rounded-md border border-gray-200 p-4" method="get">
         <div>
           <label className="block text-xs text-gray-500">From</label>
           <input
             type="date"
             name="startDate"
             defaultValue={startDate ?? ""}
-            className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -77,7 +77,7 @@ export default async function TeamDashboardPage({
             type="date"
             name="endDate"
             defaultValue={endDate ?? ""}
-            className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -85,7 +85,7 @@ export default async function TeamDashboardPage({
           <select
             name="lineId"
             defaultValue={lineId ?? ""}
-            className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           >
             <option value="">All lines</option>
             {lines.map((line) => (
@@ -100,7 +100,7 @@ export default async function TeamDashboardPage({
           <select
             name="ownerId"
             defaultValue={ownerId ?? ""}
-            className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           >
             <option value="">Everyone</option>
             {teamMembers.map((member) => (
@@ -115,7 +115,7 @@ export default async function TeamDashboardPage({
           <select
             name="status"
             defaultValue={status ?? ""}
-            className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           >
             <option value="">Active and later</option>
             {POLICY_STATUSES.map((s) => (
@@ -125,7 +125,10 @@ export default async function TeamDashboardPage({
             ))}
           </select>
         </div>
-        <button type="submit" className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800">
+        <button
+          type="submit"
+          className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium"
+        >
           Apply filters
         </button>
         {(startDate || endDate || lineId || ownerId || status) && (

@@ -15,7 +15,7 @@ export function ResetPasswordButton({ userId }: { userId: string }) {
         <button
           type="submit"
           disabled={isPending}
-          className="text-xs text-gray-500 underline hover:text-gray-800 disabled:opacity-50"
+          className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium disabled:opacity-50"
         >
           {isPending ? "Resetting…" : "Reset password"}
         </button>

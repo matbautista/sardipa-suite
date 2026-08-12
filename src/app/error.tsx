@@ -25,7 +25,7 @@ export default function ErrorBoundary({ error, reset }: { error: Error & { diges
         <button
           type="button"
           onClick={() => reset()}
-          className="mt-4 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          className="mt-4 rounded-md btn-primary px-3 py-2 text-sm font-medium"
         >
           Try again
         </button>

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // scripts/package-release.mjs output (Section 10 phase 17) — a
+    // committed build artifact, not source to lint.
+    "release/**",
   ]),
 ]);
 

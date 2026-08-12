@@ -82,7 +82,7 @@ export default async function TeamLeadsPage({
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">
           {session.user.role === "head" ? "Agency Leads" : "Team Leads"}
@@ -114,7 +114,7 @@ export default async function TeamLeadsPage({
         </p>
         <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
           {unassignedOrNeedsReview.map((lead) => (
-            <li key={lead.id} className="flex items-center justify-between px-4 py-3 text-sm">
+            <li key={lead.id} className="flex items-end justify-between gap-4 px-4 py-3 text-sm">
               <div>
                 <span className="text-gray-800">{lead.name}</span>
                 <span className="ml-2 text-gray-400">
@@ -140,7 +140,7 @@ export default async function TeamLeadsPage({
                         </option>
                       ))}
                   </select>
-                  <button type="submit" className="text-xs text-gray-500 underline hover:text-gray-800">
+                  <button type="submit" className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium">
                     Claim
                   </button>
                 </form>
@@ -207,7 +207,7 @@ export default async function TeamLeadsPage({
           <select
             name="status"
             defaultValue={status ?? ""}
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           >
             <option value="">All statuses</option>
             {STATUSES.map((s) => (
@@ -219,7 +219,7 @@ export default async function TeamLeadsPage({
           <select
             name="ownerId"
             defaultValue={ownerId ?? ""}
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           >
             <option value="">All agents</option>
             {teamMembers.map((member) => (
@@ -228,10 +228,7 @@ export default async function TeamLeadsPage({
               </option>
             ))}
           </select>
-          <button
-            type="submit"
-            className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
-          >
+          <button type="submit" className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium">
             Filter
           </button>
         </form>
@@ -264,7 +261,7 @@ export default async function TeamLeadsPage({
                       </option>
                     ))}
                 </select>
-                <button type="submit" className="text-xs text-gray-500 underline hover:text-gray-800">
+                <button type="submit" className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium">
                   Reassign
                 </button>
               </form>

@@ -74,10 +74,9 @@ export default async function NewPolicyPage({
   }
 
   const lines = await listInsuranceLines(session.user.agencyId);
-  const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Convert &quot;{lead.name}&quot; to a Policy</h1>
         <Link href={`/leads/${leadId}`} className="text-sm text-gray-500 underline hover:text-gray-800">
@@ -87,7 +86,7 @@ export default async function NewPolicyPage({
 
       {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      <form action={convertLeadToPolicyAction} className="mt-8 space-y-4">
+      <form action={convertLeadToPolicyAction} className="mt-8 space-y-4 rounded-md border border-gray-200 p-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Insurance line</label>
@@ -95,7 +94,7 @@ export default async function NewPolicyPage({
               name="lineId"
               required
               defaultValue={lead.lineId ?? ""}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             >
               <option value="">— choose —</option>
               {lines.map((line) => (
@@ -111,14 +110,20 @@ export default async function NewPolicyPage({
               name="productId"
               required
               defaultValue={lead.productId ?? ""}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             >
               <option value="">— choose —</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name} ({product.lineName})
-                </option>
-              ))}
+              {lines
+                .filter((line) => line.products.length > 0)
+                .map((line) => (
+                  <optgroup key={line.id} label={line.name}>
+                    {line.products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
             </select>
           </div>
         </div>
@@ -131,7 +136,7 @@ export default async function NewPolicyPage({
               step="0.01"
               min="0.01"
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
           <div>
@@ -141,7 +146,7 @@ export default async function NewPolicyPage({
               type="number"
               step="0.01"
               min="0"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
         </div>
@@ -152,7 +157,7 @@ export default async function NewPolicyPage({
               name="startDate"
               type="date"
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
           <div>
@@ -161,7 +166,7 @@ export default async function NewPolicyPage({
               name="renewalDate"
               type="date"
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
             <p className="mt-1 text-xs text-gray-400">
               For a Travel policy, this is the trip&apos;s end date rather than an annual renewal.
@@ -170,7 +175,7 @@ export default async function NewPolicyPage({
         </div>
         <button
           type="submit"
-          className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
         >
           Create draft policy
         </button>

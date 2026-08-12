@@ -50,7 +50,7 @@ export default async function SystemSettingsPage({
   const lanUrl = buildLanUrl(hostIp, hostPort);
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">System Configuration</h1>
         <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
@@ -80,7 +80,7 @@ export default async function SystemSettingsPage({
             required
             defaultValue={hostIp ?? ""}
             placeholder="e.g. 192.168.1.50"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -90,12 +90,12 @@ export default async function SystemSettingsPage({
             type="number"
             defaultValue={hostPort ?? ""}
             placeholder="3000"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <button
           type="submit"
-          className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
         >
           Save
         </button>
@@ -130,37 +130,39 @@ export default async function SystemSettingsPage({
           <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900">
             Add a new storage location
           </summary>
-          <form action={addStorageLocationAction} className="mt-3 space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700">Label</label>
-              <input
-                name="label"
-                type="text"
-                placeholder="e.g. Internal Drive E:"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700">Storage path</label>
-              <input
-                name="path"
-                type="text"
-                required
-                placeholder="e.g. E:\SaripdaDocuments"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
-              />
-              <p className="mt-1 text-xs text-gray-400">
-                Must be on a different physical disk than the app itself (the app is currently on{" "}
-                {describeVolume(process.cwd())}).
-              </p>
-            </div>
-            <button
-              type="submit"
-              className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
-            >
-              Add and make active
-            </button>
-          </form>
+          <div className="mt-3 rounded-md border border-gray-200 p-4">
+            <form action={addStorageLocationAction} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700">Label</label>
+                <input
+                  name="label"
+                  type="text"
+                  placeholder="e.g. Internal Drive E:"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700">Storage path</label>
+                <input
+                  name="path"
+                  type="text"
+                  required
+                  placeholder="e.g. E:\SaripdaDocuments"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Must be on a different physical disk than the app itself (the app is currently on{" "}
+                  {describeVolume(process.cwd())}).
+                </p>
+              </div>
+              <button
+                type="submit"
+                className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium"
+              >
+                Add and make active
+              </button>
+            </form>
+          </div>
         </details>
       </div>
     </div>

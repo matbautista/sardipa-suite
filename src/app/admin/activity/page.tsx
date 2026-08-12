@@ -24,7 +24,7 @@ export default async function HostActivityPage({
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Host Activity Log</h1>
         <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
@@ -42,7 +42,7 @@ export default async function HostActivityPage({
           <select
             name="userId"
             defaultValue={userId ?? ""}
-            className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           >
             <option value="">Everyone</option>
             {superAdmins.map((user) => (
@@ -58,7 +58,7 @@ export default async function HostActivityPage({
             name="startDate"
             type="date"
             defaultValue={startDate ?? ""}
-            className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -67,12 +67,12 @@ export default async function HostActivityPage({
             name="endDate"
             type="date"
             defaultValue={endDate ?? ""}
-            className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <button
           type="submit"
-          className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+          className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium"
         >
           Filter
         </button>

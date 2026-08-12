@@ -20,7 +20,7 @@ export default async function PoliciesPage() {
   const policies = await listOwnPolicies(session.user.agencyId, session.user.id);
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">My Policies</h1>
         <div className="flex gap-4">

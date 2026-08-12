@@ -9,7 +9,7 @@ import { resolveAccessibleOwner } from "@/lib/team-access";
 const RECORD_TYPE = "policy";
 
 const inputClass =
-  "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none";
+  "mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none";
 
 export default async function AutoDetailsPage({
   params,
@@ -92,7 +92,7 @@ export default async function AutoDetailsPage({
   const { autoOwner, vehicle } = details;
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Owner &amp; Vehicle Details</h1>
         <div className="flex items-center gap-4">
@@ -158,7 +158,7 @@ export default async function AutoDetailsPage({
         </p>
         <button
           type="submit"
-          className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+          className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
         >
           Save
         </button>

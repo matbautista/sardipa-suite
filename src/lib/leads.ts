@@ -171,6 +171,18 @@ export async function deleteLead(
     return { ok: false, error: "Lead not found." };
   }
 
+  // Found in a full-app QA pass: this had no check for an already-converted
+  // Policy, unlike deleteInsuranceLine/deleteProduct's equivalent guards
+  // (insurance-lines.ts) — a Won lead's "Delete this lead" button could
+  // delete the Lead out from under its own Policy.leadId reference, and
+  // Prisma's default onDelete for this optional FK is SetNull, so the
+  // Policy would silently lose its only link back to the lead it came
+  // from rather than the delete being blocked.
+  const convertedPolicyCount = await scoped.policy.count({ where: { leadId } });
+  if (convertedPolicyCount > 0) {
+    return { ok: false, error: `Can't delete "${existing.name}" — it has already been converted to a policy.` };
+  }
+
   // Logged before the delete, not after — ActivityLog.leadId has no
   // ON DELETE CASCADE-safe way to reference a row that no longer exists,
   // and Section 5 requires the delete itself to be audited, not just

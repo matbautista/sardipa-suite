@@ -44,10 +44,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     listOwnLeads(session.user.agencyId, session.user.id),
     listInsuranceLines(session.user.agencyId),
   ]);
-  const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
-
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">My Leads</h1>
         <div className="flex gap-4">
@@ -80,14 +78,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
 
       <div className="mt-8">
         <h2 className="text-sm font-medium text-gray-700">Add a lead</h2>
-        <form action={createLeadAction} className="mt-3 space-y-4">
+        <form action={createLeadAction} className="mt-3 space-y-4 rounded-md border border-gray-200 p-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Name</label>
             <input
               name="name"
               type="text"
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -96,7 +94,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               <input
                 name="phone"
                 type="text"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
               />
             </div>
             <div>
@@ -104,7 +102,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               <input
                 name="email"
                 type="email"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
               />
             </div>
           </div>
@@ -115,7 +113,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               type="text"
               defaultValue="Manual"
               placeholder="e.g. Referral, Manual, Walk-in"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -123,7 +121,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               <label className="block text-sm font-medium text-gray-700">Insurance line (optional)</label>
               <select
                 name="lineId"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
               >
                 <option value="">— none yet —</option>
                 {lines.map((line) => (
@@ -137,14 +135,20 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               <label className="block text-sm font-medium text-gray-700">Product (optional)</label>
               <select
                 name="productId"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
               >
                 <option value="">— none yet —</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} ({product.lineName})
-                  </option>
-                ))}
+                {lines
+                  .filter((line) => line.products.length > 0)
+                  .map((line) => (
+                    <optgroup key={line.id} label={line.name}>
+                      {line.products.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
               </select>
             </div>
           </div>
@@ -156,7 +160,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <input
               name="nextFollowUpDate"
               type="date"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
           <div>
@@ -169,7 +173,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           </div>
           <button
             type="submit"
-            className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
           >
             Add lead
           </button>

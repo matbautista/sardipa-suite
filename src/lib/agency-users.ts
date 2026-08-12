@@ -170,8 +170,9 @@ export async function reassignAgentManager(
     return { ok: false, error: "Agent not found." };
   }
 
+  let manager = null;
   if (managerId) {
-    const manager = await scoped.user.findUnique({ where: { id: managerId } });
+    manager = await scoped.user.findUnique({ where: { id: managerId } });
     if (!manager || manager.role !== "manager") {
       return { ok: false, error: "Choose a valid manager." };
     }
@@ -182,7 +183,10 @@ export async function reassignAgentManager(
     data: {
       userId: agentUserId,
       action: "manager_reassigned",
-      note: managerId ? `Reassigned to manager ${managerId}` : "Unassigned from manager",
+      // Found in a full-app QA pass: this logged the raw managerId (a
+      // cuid) instead of the manager's name, so the Activity Log showed an
+      // unreadable id to anyone auditing a reassignment.
+      note: manager ? `Reassigned to manager ${manager.name}` : "Unassigned from manager",
     },
   });
 

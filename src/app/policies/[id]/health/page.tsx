@@ -9,6 +9,10 @@ import { resolveAccessibleOwner } from "@/lib/team-access";
 const RECORD_TYPE = "policy";
 
 const inputClass =
+  "mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none";
+// Textareas stay full-width — they hold free-text notes, unlike the
+// single-line/select fields above that share inputClass.
+const textareaClass =
   "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none";
 
 function toDateInputValue(date: Date | null | undefined): string {
@@ -94,7 +98,7 @@ export default async function HealthDetailsPage({
   const formInert = lockedByOther || !editMode;
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Health Details</h1>
         <div className="flex items-center gap-4">
@@ -152,7 +156,7 @@ export default async function HealthDetailsPage({
             name="existingMedicalConditions"
             rows={3}
             defaultValue={detail?.existingMedicalConditions ?? ""}
-            className={inputClass}
+            className={textareaClass}
           />
         </div>
         <div>
@@ -166,7 +170,7 @@ export default async function HealthDetailsPage({
             rows={3}
             placeholder="One per line: name, relationship, birthdate"
             defaultValue={detail?.dependents ?? ""}
-            className={inputClass}
+            className={textareaClass}
           />
         </div>
         <div>
@@ -185,12 +189,12 @@ export default async function HealthDetailsPage({
             name="preexistingConditionDisclosure"
             rows={3}
             defaultValue={detail?.preexistingConditionDisclosure ?? ""}
-            className={inputClass}
+            className={textareaClass}
           />
         </div>
         <button
           type="submit"
-          className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+          className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
         >
           Save
         </button>

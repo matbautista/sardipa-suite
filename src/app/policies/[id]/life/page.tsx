@@ -223,7 +223,7 @@ function PersonFieldset({ person, required = true }: { person: PersonLike; requi
 }
 
 const inputClass =
-  "mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none";
+  "mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none";
 
 const BENEFICIARY_SLOTS: { type: "primary" | "contingent"; slot: number; label: string }[] = [
   { type: "primary", slot: 1, label: "Primary Beneficiary 1" },
@@ -382,7 +382,7 @@ export default async function LifeDetailsPage({
   const beneficiaryByKey = new Map(beneficiaries.map((b) => [`${b.beneficiaryType}-${b.slotNumber}`, b]));
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Life Insurance Details</h1>
         <div className="flex items-center gap-4">
@@ -422,7 +422,7 @@ export default async function LifeDetailsPage({
           </label>
           <button
             type="submit"
-            className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+            className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
           >
             Save Insured
           </button>
@@ -515,7 +515,7 @@ export default async function LifeDetailsPage({
           </div>
           <button
             type="submit"
-            className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+            className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
           >
             Save Owner
           </button>
@@ -592,7 +592,7 @@ export default async function LifeDetailsPage({
                 <div className="flex gap-3">
                   <button
                     type="submit"
-                    className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
+                    className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium"
                   >
                     Save
                   </button>
@@ -600,7 +600,7 @@ export default async function LifeDetailsPage({
                     <button
                       type="submit"
                       formAction={clearBeneficiaryAction}
-                      className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                      className="inline-block min-w-[110px] rounded-md bg-red-600 px-2.5 py-1 text-center text-xs font-medium text-white hover:bg-red-700"
                     >
                       Clear
                     </button>

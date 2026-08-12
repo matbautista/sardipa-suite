@@ -57,24 +57,103 @@ export async function renameInsuranceLine(agencyId: string, lineId: string, name
   return { ok: true };
 }
 
+// Deletion is blocked rather than cascaded — a line/product that already
+// has leads or policies pointing at it is real sales data, not something
+// safe to silently orphan or wipe out from an "Insurance Lines" screen.
+// Same "surface it, don't cascade" call as setAgencyUserActive's
+// open-leads/policies warning in agency-users.ts, except here it's a hard
+// block rather than a warning, since there's no reassignment target for a
+// deleted line/product the way there is for a deactivated user.
+export async function deleteInsuranceLine(agencyId: string, actorId: string, lineId: string): Promise<ActionResult> {
+  const scoped = getScopedPrisma(agencyId);
+  const line = await scoped.insuranceLine.findUnique({ where: { id: lineId } });
+  if (!line) {
+    return { ok: false, error: "That insurance line doesn't exist." };
+  }
+
+  const [productCount, leadCount, policyCount] = await Promise.all([
+    scoped.product.count({ where: { lineId } }),
+    scoped.lead.count({ where: { lineId } }),
+    scoped.policy.count({ where: { lineId } }),
+  ]);
+  if (productCount > 0) {
+    return {
+      ok: false,
+      error: `Can't delete "${line.name}" — delete its ${productCount} product${productCount === 1 ? "" : "s"} first.`,
+    };
+  }
+  if (leadCount > 0 || policyCount > 0) {
+    const parts = [];
+    if (leadCount > 0) parts.push(`${leadCount} lead${leadCount === 1 ? "" : "s"}`);
+    if (policyCount > 0) parts.push(`${policyCount} polic${policyCount === 1 ? "y" : "ies"}`);
+    return { ok: false, error: `Can't delete "${line.name}" — ${parts.join(" and ")} still reference it.` };
+  }
+
+  // Logged before the delete, same reasoning as leads.ts's deleteLead —
+  // ActivityLog has no lineId column to safely reference afterward, and the
+  // delete itself needs to be in the audit trail.
+  await scoped.activityLog.create({
+    data: { userId: actorId, action: "insurance_line_deleted", note: `"${line.name}" (${line.category}) deleted` },
+  });
+  await scoped.insuranceLine.delete({ where: { id: lineId } });
+  return { ok: true };
+}
+
+export async function deleteProduct(agencyId: string, actorId: string, productId: string): Promise<ActionResult> {
+  const scoped = getScopedPrisma(agencyId);
+  const product = await scoped.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    return { ok: false, error: "That product doesn't exist." };
+  }
+
+  const [leadCount, policyCount] = await Promise.all([
+    scoped.lead.count({ where: { productId } }),
+    scoped.policy.count({ where: { productId } }),
+  ]);
+  if (leadCount > 0 || policyCount > 0) {
+    const parts = [];
+    if (leadCount > 0) parts.push(`${leadCount} lead${leadCount === 1 ? "" : "s"}`);
+    if (policyCount > 0) parts.push(`${policyCount} polic${policyCount === 1 ? "y" : "ies"}`);
+    return { ok: false, error: `Can't delete "${product.name}" — ${parts.join(" and ")} still reference it.` };
+  }
+
+  await scoped.activityLog.create({
+    data: { userId: actorId, action: "product_deleted", note: `"${product.name}" deleted` },
+  });
+  await scoped.product.delete({ where: { id: productId } });
+  return { ok: true };
+}
+
 export async function updateProduct(
   agencyId: string,
   productId: string,
   name: string,
-  description: string
+  description: string,
+  lifePolicyType: string
 ): Promise<ActionResult> {
   const trimmedName = name.trim();
   if (!trimmedName) {
     return { ok: false, error: "Product name is required." };
   }
   const scoped = getScopedPrisma(agencyId);
-  const product = await scoped.product.findUnique({ where: { id: productId } });
+  // findUnique here is safe even though it's normally the "unverified"
+  // single-record op tenant-db.ts warns about — getScopedPrisma still
+  // verifies ownership on it, and `include: { line: true }` is needed to
+  // know the same category rule createProduct applies (life-only field).
+  const product = await scoped.product.findUnique({ where: { id: productId }, include: { line: true } });
   if (!product) {
     return { ok: false, error: "That product doesn't exist." };
   }
+
+  const trimmedLifePolicyType = lifePolicyType.trim();
+  if (trimmedLifePolicyType && !VALID_LIFE_POLICY_TYPES.includes(trimmedLifePolicyType as (typeof VALID_LIFE_POLICY_TYPES)[number])) {
+    return { ok: false, error: "Choose a valid life policy type." };
+  }
+  const lifePolicyTypeToStore = product.line.category === "life" && trimmedLifePolicyType ? trimmedLifePolicyType : null;
+
   await scoped.product.update({
     where: { id: productId },
-    data: { name: trimmedName, description: description.trim() || null },
+    data: { name: trimmedName, description: description.trim() || null, lifePolicyType: lifePolicyTypeToStore },
   });
   return { ok: true };
 }

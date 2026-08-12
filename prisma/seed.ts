@@ -112,7 +112,11 @@ async function main() {
     const slug = spec.name.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
     const agency = await prisma.agency.create({
-      data: { name: spec.name },
+      // "markeys" here should track src/lib/themes.ts's DEFAULT_THEME_ID —
+      // not imported directly since this script runs standalone via tsx,
+      // outside Next's bundler, and every other import here is likewise
+      // kept relative/self-contained rather than through the `@/` alias.
+      data: { name: spec.name, theme: "markeys" },
     });
 
     await prisma.user.create({

@@ -110,7 +110,7 @@ export default async function SystemHealthPage({
   );
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">System Health</h1>
         <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
@@ -133,7 +133,7 @@ export default async function SystemHealthPage({
         <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
           {activeAlerts.map((alert) => (
             <li key={alert.id} className="px-4 py-3 text-sm">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-end justify-between gap-4">
                 <div>
                   <span className="font-medium text-red-700">{ALERT_TYPE_LABELS[alert.type] ?? alert.type}</span>
                   {alert.agencyId && (
@@ -146,7 +146,10 @@ export default async function SystemHealthPage({
                 </div>
                 <form action={resolveAlertAction}>
                   <input type="hidden" name="alertId" value={alert.id} />
-                  <button type="submit" className="whitespace-nowrap text-xs text-gray-500 underline hover:text-gray-800">
+                  <button
+                    type="submit"
+                    className="inline-block min-w-[110px] whitespace-nowrap rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium"
+                  >
                     Mark resolved
                   </button>
                 </form>
@@ -161,7 +164,10 @@ export default async function SystemHealthPage({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-gray-700">Storage locations</h2>
           <form action={checkStorageNowAction}>
-            <button type="submit" className="text-xs text-gray-500 underline hover:text-gray-800">
+            <button
+              type="submit"
+              className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium"
+            >
               Check now
             </button>
           </form>

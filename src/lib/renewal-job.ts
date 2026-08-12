@@ -1,5 +1,5 @@
-import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { getSystemActorId } from "@/lib/system-actor";
 
 // Policy Renewal & Lapsing daily job (Section 10 phase 9 / Section 5's
 // "Policy Renewal & Lapsing Rules"). Runs across every agency — like
@@ -8,59 +8,16 @@ import { prisma } from "@/lib/prisma";
 // prisma singleton directly rather than getScopedPrisma.
 //
 // Every automatic transition below writes to ActivityLog, attributed to a
-// reserved "system" actor (getSystemActorId() below) — found in a full-app
-// review that this had been skipped ("ActivityLog.userId is required, and
-// there's no real user to attribute an automated status change to"), but
-// Section 5's Audit/Activity Log requirement doesn't carve out an exception
-// for automated changes: "every create/update/delete on a ... Policy ...
-// is written to ActivityLog" applies here exactly as much as to a
-// human-triggered one. Policy.updatedAt (schema) is the row-level fallback
-// for "when," same role it plays on every other table.
+// reserved "system" actor (getSystemActorId(), system-actor.ts) — found in
+// a full-app review that this had been skipped ("ActivityLog.userId is
+// required, and there's no real user to attribute an automated status
+// change to"), but Section 5's Audit/Activity Log requirement doesn't carve
+// out an exception for automated changes: "every create/update/delete on a
+// ... Policy ... is written to ActivityLog" applies here exactly as much as
+// to a human-triggered one. Policy.updatedAt (schema) is the row-level
+// fallback for "when," same role it plays on every other table.
 
 const GRACE_PERIOD_DAYS = 30;
-
-const SYSTEM_ACTOR_EMAIL = "system@saripda.internal";
-
-// Gets or lazily creates the reserved system-actor User row that automated
-// jobs attribute their ActivityLog writes to. isActive: false makes it
-// permanently unable to log in (verifyCredentials's isActive check runs
-// before any password comparison) — this account exists purely as an
-// ActivityLog.userId target, never as a real login. agencyId is left null,
-// same as Super Admin: this actor sits outside every agency, since the job
-// itself runs host-wide.
-async function getSystemActorId(): Promise<string> {
-  const existing = await prisma.user.findUnique({ where: { email: SYSTEM_ACTOR_EMAIL } });
-  if (existing) return existing.id;
-  try {
-    const created = await prisma.user.create({
-      data: {
-        name: "System (automated)",
-        email: SYSTEM_ACTOR_EMAIL,
-        // Random, not a real bcrypt hash — isActive: false already blocks
-        // login before this would ever be compared against, but there's no
-        // reason for it to even look like a usable credential.
-        passwordHash: randomBytes(32).toString("hex"),
-        role: "system",
-        isActive: false,
-      },
-    });
-    return created.id;
-  } catch (error) {
-    // Two overlapping calls (e.g. instrumentation.ts's register() firing
-    // more than once — Next.js dev fast-refresh, or an overlapping
-    // watchdog-triggered restart) can both see `existing` as null above and
-    // race to create this row; email is @unique, so the loser gets Prisma's
-    // P2002 instead of a duplicate row. Re-fetch the winner's row rather
-    // than letting the whole job run fail on it.
-    const isDuplicateEmail =
-      typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
-    if (isDuplicateEmail) {
-      const winner = await prisma.user.findUnique({ where: { email: SYSTEM_ACTOR_EMAIL } });
-      if (winner) return winner.id;
-    }
-    throw error;
-  }
-}
 
 export type RenewalJobResult = {
   lapsed: number;

@@ -16,7 +16,7 @@ export default async function RemindersPage() {
   const upcoming = followUps.filter((item) => !item.overdue);
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Reminders</h1>
         <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">

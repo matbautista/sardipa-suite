@@ -29,7 +29,7 @@ export async function createManagerFormAction(
     return { error: result.error, success: null };
   }
 
-  revalidatePath("/agency/users");
+  revalidatePath("/agency/settings");
   return { error: null, success: { email: result.email, temporaryPassword: result.temporaryPassword } };
 }
 
@@ -47,7 +47,7 @@ export async function createAgentFormAction(
     return { error: result.error, success: null };
   }
 
-  revalidatePath("/agency/users");
+  revalidatePath("/agency/settings");
   return { error: null, success: { email: result.email, temporaryPassword: result.temporaryPassword } };
 }
 
@@ -68,7 +68,7 @@ export async function resetPasswordFormAction(
     return { error: result.error, success: null };
   }
 
-  revalidatePath("/agency/users");
+  revalidatePath("/agency/settings");
   return { error: null, success: { temporaryPassword: result.temporaryPassword } };
 }
 
@@ -83,11 +83,11 @@ export async function toggleActiveAction(formData: FormData) {
     // targetUserId that no longer resolves) was previously discarded —
     // the form just appeared to do nothing. Same redirect-with-error
     // pattern the rest of the app uses post-review.
-    redirect(`/agency/users?error=${encodeURIComponent(result.error)}`);
+    redirect(`/agency/settings?tab=users&error=${encodeURIComponent(result.error)}`);
   }
-  revalidatePath("/agency/users");
+  revalidatePath("/agency/settings");
   if (result.warning) {
-    redirect(`/agency/users?warning=${encodeURIComponent(result.warning)}`);
+    redirect(`/agency/settings?tab=users&warning=${encodeURIComponent(result.warning)}`);
   }
 }
 
@@ -98,7 +98,11 @@ export async function reassignManagerAction(formData: FormData) {
 
   const result = await reassignAgentManager(session.user.agencyId, agentUserId, managerId);
   if (!result.ok) {
-    redirect(`/agency/users?error=${encodeURIComponent(result.error)}`);
+    // Sends the Head back to the same reassign panel (not just the bare
+    // list) so a validation error doesn't silently drop their in-progress
+    // edit — same pattern as renameLineAction/updateProductAction.
+    redirect(`/agency/settings?tab=users&editAgentId=${agentUserId}&error=${encodeURIComponent(result.error)}`);
   }
-  revalidatePath("/agency/users");
+  revalidatePath("/agency/settings");
+  redirect("/agency/settings?tab=users");
 }

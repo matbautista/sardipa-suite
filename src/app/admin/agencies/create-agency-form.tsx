@@ -30,7 +30,7 @@ export function CreateAgencyForm() {
             name="agencyName"
             type="text"
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -42,7 +42,7 @@ export function CreateAgencyForm() {
             name="headName"
             type="text"
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -54,7 +54,7 @@ export function CreateAgencyForm() {
             name="headEmail"
             type="email"
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -65,7 +65,7 @@ export function CreateAgencyForm() {
         <button
           type="submit"
           disabled={isPending}
-          className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium disabled:opacity-50"
         >
           {isPending ? "Creating…" : "Create agency"}
         </button>

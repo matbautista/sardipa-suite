@@ -24,7 +24,7 @@ export default async function SearchPage({
     : { leads: [], policies: [] };
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Search</h1>
         <Link href="/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
@@ -52,7 +52,7 @@ export default async function SearchPage({
         />
         <button
           type="submit"
-          className="whitespace-nowrap rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          className="inline-block min-w-[170px] whitespace-nowrap rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
         >
           Search
         </button>

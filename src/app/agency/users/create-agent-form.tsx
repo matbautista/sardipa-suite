@@ -5,7 +5,10 @@ import { createAgentFormAction, type CreateUserFormState } from "./actions";
 
 const initialState: CreateUserFormState = { error: null, success: null };
 
-export function CreateAgentForm({ managers }: { managers: { id: string; name: string }[] }) {
+// managerId is fixed by whichever manager's (or "Unassigned") card this form
+// is nested in — same as createProductAction's lineId, there's no picker
+// here for it since the surrounding card already says which one.
+export function CreateAgentForm({ managerId }: { managerId: string | null }) {
   const [state, formAction, isPending] = useActionState(createAgentFormAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -27,7 +30,7 @@ export function CreateAgentForm({ managers }: { managers: { id: string; name: st
             name="name"
             type="text"
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -39,26 +42,10 @@ export function CreateAgentForm({ managers }: { managers: { id: string; name: st
             name="email"
             type="email"
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+            className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
-        <div>
-          <label htmlFor="agentManagerId" className="block text-sm font-medium text-gray-700">
-            Manager (optional)
-          </label>
-          <select
-            id="agentManagerId"
-            name="managerId"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
-          >
-            <option value="">— unassigned —</option>
-            {managers.map((manager) => (
-              <option key={manager.id} value={manager.id}>
-                {manager.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <input type="hidden" name="managerId" value={managerId ?? ""} />
 
         {state.error && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p>
@@ -67,7 +54,7 @@ export function CreateAgentForm({ managers }: { managers: { id: string; name: st
         <button
           type="submit"
           disabled={isPending}
-          className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium disabled:opacity-50"
         >
           {isPending ? "Creating…" : "Create agent"}
         </button>

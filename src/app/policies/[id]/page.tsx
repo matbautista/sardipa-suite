@@ -199,12 +199,11 @@ export default async function PolicyDetailPage({
     listInsuranceLines(session.user.agencyId),
     listPolicyDocuments(session.user.agencyId, accessibleOwnerId, id),
   ]);
-  const products = lines.flatMap((line) => line.products.map((product) => ({ ...product, lineName: line.name })));
 
   const canRenew = policy.status === "lapsed" || policy.status === "grace_period";
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">
           {policy.product.name} ({policy.line.name})
@@ -298,7 +297,7 @@ export default async function PolicyDetailPage({
           <form
             action={updatePolicyAction}
             inert={formInert}
-            className={`mt-8 space-y-4 ${formInert ? "opacity-50" : ""}`}
+            className={`mt-8 space-y-4 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
           >
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -308,7 +307,7 @@ export default async function PolicyDetailPage({
                   name="lineId"
                   required
                   defaultValue={policy.lineId}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
                 >
                   {lines.map((line) => (
                     <option key={line.id} value={line.id}>
@@ -324,13 +323,19 @@ export default async function PolicyDetailPage({
                   name="productId"
                   required
                   defaultValue={policy.productId}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
                 >
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} ({product.lineName})
-                    </option>
-                  ))}
+                  {lines
+                    .filter((line) => line.products.length > 0)
+                    .map((line) => (
+                      <optgroup key={line.id} label={line.name}>
+                        {line.products.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
                 </select>
               </div>
             </div>
@@ -344,7 +349,7 @@ export default async function PolicyDetailPage({
                   min="0.01"
                   required
                   defaultValue={policy.premium}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
                 />
               </div>
               <div>
@@ -355,7 +360,7 @@ export default async function PolicyDetailPage({
                   step="0.01"
                   min="0"
                   defaultValue={policy.commission ?? ""}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -367,7 +372,7 @@ export default async function PolicyDetailPage({
                   type="date"
                   required
                   defaultValue={toDateInputValue(policy.startDate)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
                 />
               </div>
               <div>
@@ -377,13 +382,13 @@ export default async function PolicyDetailPage({
                   type="date"
                   required
                   defaultValue={toDateInputValue(policy.renewalDate)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                  className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
                 />
               </div>
             </div>
             <button
               type="submit"
-              className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
             >
               Save changes
             </button>
@@ -393,7 +398,7 @@ export default async function PolicyDetailPage({
             <button
               type="submit"
               disabled={!policy.proofOfPaymentDocId}
-              className="w-full rounded-md bg-green-700 px-3 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-block min-w-[170px] rounded-md bg-green-700 px-4 py-2 text-center text-sm font-medium text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Activate policy
             </button>
@@ -435,7 +440,7 @@ export default async function PolicyDetailPage({
           />
           <button
             type="submit"
-            className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="inline-block min-w-[170px] rounded-md btn-primary px-4 py-2 text-center text-sm font-medium"
           >
             Renew policy
           </button>
@@ -466,7 +471,7 @@ export default async function PolicyDetailPage({
         <form
           action={uploadDocumentAction}
           inert={formInert}
-          className={`mt-3 space-y-3 ${formInert ? "opacity-50" : ""}`}
+          className={`mt-3 space-y-3 rounded-md border border-gray-200 p-4 ${formInert ? "opacity-50" : ""}`}
         >
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -474,7 +479,7 @@ export default async function PolicyDetailPage({
               <select
                 name="docType"
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-gray-500 focus:outline-none"
               >
                 <option value="proof_of_payment">Proof of Payment</option>
                 <option value="valid_id">Valid ID</option>
@@ -494,7 +499,7 @@ export default async function PolicyDetailPage({
           </div>
           <button
             type="submit"
-            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
+            className="inline-block min-w-[110px] rounded-md btn-primary px-2.5 py-1 text-center text-xs font-medium"
           >
             Upload document
           </button>

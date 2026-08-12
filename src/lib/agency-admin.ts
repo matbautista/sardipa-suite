@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { generateTemporaryPassword } from "@/lib/password-policy";
+import { DEFAULT_THEME_ID } from "@/lib/themes";
 
 // Super Admin's Agency Onboarding (Section 5 / Section 10 phase 5): "you
 // manually create each new agency and its initial Agency Head account."
@@ -51,7 +52,9 @@ export async function createAgencyWithHead(
   // if the User insert fails (e.g. a duplicate-email race), the Agency
   // insert must not be left behind either.
   const { agency, head } = await prisma.$transaction(async (tx) => {
-    const agency = await tx.agency.create({ data: { name: trimmedAgencyName } });
+    // Explicit, not relying on the schema column's own default — src/lib/themes.ts
+    // is the one place "the default theme" is decided.
+    const agency = await tx.agency.create({ data: { name: trimmedAgencyName, theme: DEFAULT_THEME_ID } });
     const head = await tx.user.create({
       data: {
         agencyId: agency.id,

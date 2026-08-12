@@ -43,77 +43,18 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
+    <div className="mx-auto w-full max-w-4xl px-6 py-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
+          <h1 className="text-xl font-semibold text-gray-900">{isSuperAdmin ? "Admin Dashboard" : "My Dashboard"}</h1>
           <p className="mt-1 text-sm text-gray-500">
             Signed in as {user.name} &middot; role: {user.role}
             {isSuperAdmin ? " (sits outside every agency)" : ""}
           </p>
         </div>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/login" });
-          }}
-        >
-          <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
-            Sign out
-          </button>
-        </form>
-      </div>
-
-      {isSuperAdmin ? (
-        <div className="mt-8">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-700">Agencies on this installation</h2>
-            <div className="flex gap-4">
-              <Link href="/admin/health" className="text-sm text-gray-500 underline hover:text-gray-800">
-                System health
-              </Link>
-              <Link href="/admin/activity" className="text-sm text-gray-500 underline hover:text-gray-800">
-                Activity log
-              </Link>
-              <Link href="/admin/settings" className="text-sm text-gray-500 underline hover:text-gray-800">
-                System configuration
-              </Link>
-              <Link href="/admin/agencies" className="text-sm text-gray-500 underline hover:text-gray-800">
-                Manage agencies
-              </Link>
-            </div>
-          </div>
-          <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-            {agencies.map((agency) => (
-              <li key={agency.id} className="px-4 py-3 text-sm text-gray-800">
-                {agency.name}
-              </li>
-            ))}
-            {agencies.length === 0 && (
-              <li className="px-4 py-3 text-sm text-gray-400">No agencies yet.</li>
-            )}
-          </ul>
-        </div>
-      ) : (
-        <div className="mt-8">
-          {user.role === "head" && (
-            <div className="mb-6 flex gap-4">
-              <Link href="/agency/lines" className="text-sm text-gray-500 underline hover:text-gray-800">
-                Insurance lines &amp; products
-              </Link>
-              <Link href="/agency/users" className="text-sm text-gray-500 underline hover:text-gray-800">
-                Managers &amp; agents
-              </Link>
-              <Link href="/agency/email-intake" className="text-sm text-gray-500 underline hover:text-gray-800">
-                Website inquiry intake
-              </Link>
-              <Link href="/agency/activity" className="text-sm text-gray-500 underline hover:text-gray-800">
-                Activity log
-              </Link>
-            </div>
-          )}
-          {(user.role === "manager" || user.role === "head") && (
-            <div className="mb-6 flex gap-4">
+        <div className="flex items-center gap-4">
+          {!isSuperAdmin && (user.role === "manager" || user.role === "head") && (
+            <>
               <Link href="/team/leads" className="text-sm text-gray-500 underline hover:text-gray-800">
                 {user.role === "head" ? "Agency leads" : "Team leads"}
               </Link>
@@ -123,9 +64,58 @@ export default async function DashboardPage() {
               <Link href="/team/dashboard" className="text-sm text-gray-500 underline hover:text-gray-800">
                 {user.role === "head" ? "Agency dashboard" : "Team dashboard"}
               </Link>
-            </div>
+              {user.role === "head" && (
+                <Link href="/agency/settings" className="text-sm text-gray-500 underline hover:text-gray-800">
+                  Agency settings
+                </Link>
+              )}
+            </>
           )}
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/login" });
+            }}
+          >
+            <button type="submit" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
 
+      {isSuperAdmin ? (
+        <div className="mt-8">
+          <nav className="flex gap-4">
+            <Link href="/admin/health" className="text-sm text-gray-500 underline hover:text-gray-800">
+              System health
+            </Link>
+            <Link href="/admin/activity" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Activity log
+            </Link>
+            <Link href="/admin/settings" className="text-sm text-gray-500 underline hover:text-gray-800">
+              System configuration
+            </Link>
+            <Link href="/admin/agencies" className="text-sm text-gray-500 underline hover:text-gray-800">
+              Manage agencies
+            </Link>
+          </nav>
+          <div className="mt-6">
+            <h2 className="text-sm font-medium text-gray-700">Agencies on this installation</h2>
+            <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
+              {agencies.map((agency) => (
+                <li key={agency.id} className="px-4 py-3 text-sm text-gray-800">
+                  {agency.name}
+                </li>
+              ))}
+              {agencies.length === 0 && (
+                <li className="px-4 py-3 text-sm text-gray-400">No agencies yet.</li>
+              )}
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8">
           <div className="mb-6 flex gap-4">
             <Link href="/reminders" className="text-sm text-gray-500 underline hover:text-gray-800">
               Reminders
