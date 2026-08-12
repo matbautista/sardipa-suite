@@ -31,19 +31,35 @@ const SYSTEM_ACTOR_EMAIL = "system@saripda.internal";
 async function getSystemActorId(): Promise<string> {
   const existing = await prisma.user.findUnique({ where: { email: SYSTEM_ACTOR_EMAIL } });
   if (existing) return existing.id;
-  const created = await prisma.user.create({
-    data: {
-      name: "System (automated)",
-      email: SYSTEM_ACTOR_EMAIL,
-      // Random, not a real bcrypt hash — isActive: false already blocks
-      // login before this would ever be compared against, but there's no
-      // reason for it to even look like a usable credential.
-      passwordHash: randomBytes(32).toString("hex"),
-      role: "system",
-      isActive: false,
-    },
-  });
-  return created.id;
+  try {
+    const created = await prisma.user.create({
+      data: {
+        name: "System (automated)",
+        email: SYSTEM_ACTOR_EMAIL,
+        // Random, not a real bcrypt hash — isActive: false already blocks
+        // login before this would ever be compared against, but there's no
+        // reason for it to even look like a usable credential.
+        passwordHash: randomBytes(32).toString("hex"),
+        role: "system",
+        isActive: false,
+      },
+    });
+    return created.id;
+  } catch (error) {
+    // Two overlapping calls (e.g. instrumentation.ts's register() firing
+    // more than once — Next.js dev fast-refresh, or an overlapping
+    // watchdog-triggered restart) can both see `existing` as null above and
+    // race to create this row; email is @unique, so the loser gets Prisma's
+    // P2002 instead of a duplicate row. Re-fetch the winner's row rather
+    // than letting the whole job run fail on it.
+    const isDuplicateEmail =
+      typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
+    if (isDuplicateEmail) {
+      const winner = await prisma.user.findUnique({ where: { email: SYSTEM_ACTOR_EMAIL } });
+      if (winner) return winner.id;
+    }
+    throw error;
+  }
 }
 
 export type RenewalJobResult = {

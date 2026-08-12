@@ -349,7 +349,10 @@ export default async function LifeDetailsPage({
     }
     const beneficiaryType = String(formData.get("beneficiaryType") ?? "");
     const slotNumber = Number(formData.get("slotNumber"));
-    await deleteBeneficiary(session.user.agencyId, ownerId, id, beneficiaryType, slotNumber);
+    const result = await deleteBeneficiary(session.user.agencyId, ownerId, id, beneficiaryType, slotNumber);
+    if (!result.ok) {
+      redirect(`/policies/${id}/life?error=${encodeURIComponent(result.error)}`);
+    }
     redirect(`/policies/${id}/life`);
   }
 

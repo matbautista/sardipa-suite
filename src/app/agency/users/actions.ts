@@ -85,10 +85,10 @@ export async function toggleActiveAction(formData: FormData) {
     // pattern the rest of the app uses post-review.
     redirect(`/agency/users?error=${encodeURIComponent(result.error)}`);
   }
+  revalidatePath("/agency/users");
   if (result.warning) {
     redirect(`/agency/users?warning=${encodeURIComponent(result.warning)}`);
   }
-  revalidatePath("/agency/users");
 }
 
 export async function reassignManagerAction(formData: FormData) {

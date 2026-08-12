@@ -250,7 +250,10 @@ export async function claimLead(
   callerOwnerIds: string[],
   targetOwnerId?: string
 ): Promise<ActionResult> {
-  const ownerId = targetOwnerId && callerOwnerIds.includes(targetOwnerId) ? targetOwnerId : callerId;
+  if (targetOwnerId && !callerOwnerIds.includes(targetOwnerId)) {
+    return { ok: false, error: "Choose a valid team member to assign to." };
+  }
+  const ownerId = targetOwnerId ?? callerId;
   const scoped = getScopedPrisma(agencyId);
   const lead = await scoped.lead.findUnique({ where: { id: leadId } });
   if (!lead) {

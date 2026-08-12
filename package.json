@@ -10,6 +10,7 @@
     "package": "node scripts/package-release.mjs",
     "backup": "node scripts/backup.mjs",
     "lint": "eslint",
+    "test": "node --import tsx --experimental-test-module-mocks --test src/lib/__tests__/tenant-db.test.ts src/lib/__tests__/session-gates.test.ts src/lib/__tests__/proxy-gates.test.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",

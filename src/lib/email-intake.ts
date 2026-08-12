@@ -154,7 +154,14 @@ function parseStructuredInquiry(subject: string, bodyText: string): ParsedInquir
 // entities so the "Label: value" per-line format survives extraction.
 function htmlToPlainText(html: string): string {
   return html
-    .replace(/<(br|\/p|\/div|\/li|\/tr|\/h[1-6])\s*\/?>/gi, "\n")
+    // <br> matches with `\b[^>]*` (not a bare `<br\s*\/?>`) because real
+    // inbox mail — Outlook's `<br clear=all>`, Apple Mail's `<br
+    // class="Apple-interchange-newline">` — routinely carries attributes;
+    // a bare-tag-only match silently dropped the newline for those,
+    // reintroducing the same misclassification this function exists to fix.
+    // The closing block tags never carry attributes in valid HTML, so they
+    // stay attribute-free.
+    .replace(/<br\b[^>]*>|<\/(?:p|div|li|tr|h[1-6])\s*>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")

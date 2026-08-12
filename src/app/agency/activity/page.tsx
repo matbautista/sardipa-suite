@@ -3,6 +3,7 @@ import { requireHeadSession } from "@/lib/session";
 import { listAgencyActivityLog } from "@/lib/activity-log";
 import { ACTIVITY_ACTION_LABELS } from "@/lib/status-labels";
 import { getScopedPrisma } from "@/lib/tenant-db";
+import { prisma } from "@/lib/prisma";
 
 // Agency Head's Audit/Activity Log viewer (Section 10 phase 16 / Section 5:
 // "Agency Head can view their agency's log ... a simple filterable list —
@@ -20,7 +21,7 @@ export default async function AgencyActivityPage({
   const { userId, startDate, endDate, recordType, recordId } = await searchParams;
 
   const scoped = getScopedPrisma(session.user.agencyId);
-  const [entries, users] = await Promise.all([
+  const [entries, teamUsers, systemActor] = await Promise.all([
     listAgencyActivityLog(session.user.agencyId, {
       userId: userId || undefined,
       startDate: startDate || undefined,
@@ -29,7 +30,16 @@ export default async function AgencyActivityPage({
       recordId: recordId || undefined,
     }),
     scoped.user.findMany({ orderBy: { name: "asc" } }),
+    // The renewal job's automated ActivityLog entries (renewal-job.ts) are
+    // attributed to a reserved "system" User row that, like Super Admin,
+    // sits outside every agency (agencyId: null) — so the tenant-scoped
+    // findMany above can never return it, even though its entries do show
+    // up unfiltered in this agency's log below. Fetched separately (via the
+    // unscoped client — there's nothing tenant-specific to leak, it's one
+    // fixed, host-wide row) so the User filter can actually reach them.
+    prisma.user.findFirst({ where: { role: "system" } }),
   ]);
+  const users = systemActor ? [...teamUsers, systemActor] : teamUsers;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
